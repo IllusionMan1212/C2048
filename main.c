@@ -1,8 +1,23 @@
+#include <stdio.h>
+
+#include "game.h"
+#include "zephr.h"
+
+const char *font_path = "assets/fonts/Rubik/Rubik-VariableFont_wght.ttf";
+/* const char *font_path = "assets/fonts/Roboto/Roboto-Bold.ttf"; */
+const char *title = "C2048";
+
 int main(int argc, char *argv[]) {
-  // From scratch
-  // X11 for windowing
-  // OpenGL for rendering
-  // OpenAL for audio (maybe)
-  // Windows support when everything is fine on linux using winapi
+  CORE_UNUSED(argc);
+  CORE_UNUSED(argv);
+
+  zephr_init(font_path, title, (Size){1200, 800});
+  zephr_make_window_non_resizable();
+  /* zephr_toggle_fullscreen(); */
+
+  game_loop();
+
+  zephr_deinit();
+
   return 0;
 }
