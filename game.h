@@ -13,6 +13,7 @@ typedef enum MoveDir {
 typedef struct Tile {
     u16 value;
     u16 new_value;
+    bool merged;
 
     f64 anim_x_offset_relative;
     f64 anim_y_offset_relative;
@@ -23,6 +24,9 @@ typedef struct Game {
     Tile board[4][4];
     MoveDir last_move_dir;
     bool animating;
+    bool spawning_new_tile;
+    bool game_over;
+    u32 score;
 } Game;
 
 void draw_board(void);

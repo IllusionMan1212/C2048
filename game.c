@@ -7,11 +7,19 @@
 #include "timer.h"
 #include "zephr.h"
 
-#define ANIM_SPEED 3.0f
+#define ANIM_SPEED 2.0f
 
 // TODO: configurable color palette
+// TODO: particles when merging tiles
 
 Game game = {0};
+
+const u8 neighbors[4][2] = {
+  {-1, 0}, // left
+  {1, 0},  // right 
+  {0, -1}, // up
+  {0, 1},  // down
+};
 
 ///////////////////////////////////
 //
@@ -27,6 +35,17 @@ void print_board() {
     printf("  ");
     for (int j = 0; j < 4; j++) {
       printf("%d ", game.board[i][j].value);
+    }
+    printf("\n");
+  }
+}
+
+void print_merge_status() {
+  printf("Merge Board:\n");
+  for (int i = 0; i < 4; i++) {
+    printf("  ");
+    for (int j = 0; j < 4; j++) {
+      printf("%d ", game.board[i][j].merged);
     }
     printf("\n");
   }
@@ -127,7 +146,7 @@ void draw_board() {
   set_width_constraint(&board_con, 1, UI_CONSTRAINT_ASPECT_RATIO);
   draw_quad(&board_con, ColorRGBA(140, 154, 147, 255), 8, ALIGN_CENTER);
 
-  // tiles
+  // empty tiles
   const float tile_padding = board_con.width * 0.02f;
   const float tile_height = board_con.height * 0.225f;
 
@@ -144,6 +163,7 @@ void draw_board() {
     }
   }
 
+  // filled tiles
   UIConstraints tile_con = {0};
   set_parent_constraint(&tile_con, &board_con);
   set_height_constraint(&tile_con, tile_height, UI_CONSTRAINT_FIXED);
@@ -170,6 +190,18 @@ void draw_board() {
       }
     }
   }
+
+  // score
+  char score[16];
+  sprintf(score, "%d", game.score);
+
+  set_parent_constraint(&text_con, NULL);
+  set_x_constraint(&text_con, 0.05f, UI_CONSTRAINT_RELATIVE);
+  set_y_constraint(&text_con, 0.8f, UI_CONSTRAINT_RELATIVE);
+  draw_text("Score", 40, text_con, COLOR_BLACK, ALIGN_TOP_LEFT);
+
+  set_x_constraint(&text_con, 0.15f, UI_CONSTRAINT_RELATIVE);
+  draw_text(score, 40, text_con, COLOR_BLACK, ALIGN_TOP_LEFT);
 }
 
 ///////////////////////////////////
@@ -180,7 +212,6 @@ void draw_board() {
 //
 ///////////////////////////////////
 
-// TODO: merging tiles still needs to be done, along with its animation
 void move_right() {
   if (game.animating) return;
   game.last_move_dir = MOVE_DIR_RIGHT;
@@ -193,22 +224,21 @@ void move_right() {
       u8 tiles_to_move = 0;
       u8 x = j;
 
-      printf("tile: %d,%d\n", i, j);
+      Tile *src = &game.board[i][j];
 
       do {
         x++;
 
         // next tile is empty so we can move there
         if (game.board[i][x].new_value == 0) {
-          printf("can move. empty\n");
           tiles_to_move++;
           continue;
         }
 
         // next tile has the same value so we can merge and move
-        if (game.board[i][x].new_value == game.board[i][j].new_value) {
-          printf("can move. merge\n");
+        if (game.board[i][x].new_value == src->new_value && !game.board[i][x].merged) {
           tiles_to_move++;
+          game.board[i][x].merged = true;
           break;
         } else {
           // next tile has a different value so we can't move there
@@ -217,13 +247,16 @@ void move_right() {
         }
       } while (x < 3);
 
-      printf("tiles to move: %d\n", tiles_to_move);
-
-      game.board[i][j].tiles_to_move = tiles_to_move;
+      src->tiles_to_move = tiles_to_move;
 
       if (tiles_to_move > 0) {
-        game.board[i][x].new_value = game.board[i][j].value;
-        game.board[i][j].new_value = 0;
+        if (game.board[i][x].merged) {
+          game.board[i][x].new_value *= 2;
+          game.score += game.board[i][x].new_value;
+        } else {
+          game.board[i][x].new_value = src->new_value;
+        }
+        src->new_value = 0;
         game.animating = true;
       }
     }
@@ -242,6 +275,8 @@ void move_left() {
       u8 tiles_to_move = 0;
       u8 x = j;
 
+      Tile *src = &game.board[i][j];
+
       do {
         x--;
 
@@ -252,8 +287,9 @@ void move_left() {
         }
 
         // next tile has the same value so we can merge and move
-        if (game.board[i][x].new_value == game.board[i][j].new_value) {
+        if (game.board[i][x].new_value == src->new_value && !game.board[i][x].merged) {
           tiles_to_move++;
+          game.board[i][x].merged = true;
           break;
         } else {
           // next tile has a different value so we can't move there
@@ -262,15 +298,21 @@ void move_left() {
         }
       } while (x > 0);
 
-      game.board[i][j].tiles_to_move = tiles_to_move;
+      src->tiles_to_move = tiles_to_move;
 
       if (tiles_to_move > 0) {
-        game.board[i][x].new_value = game.board[i][j].value;
-        game.board[i][j].new_value = 0;
+        if (game.board[i][x].merged) {
+          game.board[i][x].new_value *= 2;
+          game.score += game.board[i][x].new_value;
+        } else {
+          game.board[i][x].new_value = src->new_value;
+        }
+        src->new_value = 0;
         game.animating = true;
       }
     }
   }
+
 }
 
 void move_down() {
@@ -285,6 +327,8 @@ void move_down() {
       u8 tiles_to_move = 0;
       u8 y = i;
 
+      Tile *src = &game.board[i][j];
+
       do {
         y++;
 
@@ -293,8 +337,9 @@ void move_down() {
           continue;
         }
 
-        if (game.board[y][j].new_value == game.board[i][j].new_value) {
+        if (game.board[y][j].new_value == src->new_value && !game.board[y][j].merged) {
           tiles_to_move++;
+          game.board[y][j].merged = true;
           break;
         } else {
           y--;
@@ -302,11 +347,16 @@ void move_down() {
         }
       } while (y < 3);
 
-      game.board[i][j].tiles_to_move = tiles_to_move;
+      src->tiles_to_move = tiles_to_move;
 
       if (tiles_to_move > 0) {
-        game.board[y][j].new_value = game.board[i][j].value;
-        game.board[i][j].new_value = 0;
+        if (game.board[y][j].merged) {
+          game.board[y][j].new_value *= 2;
+          game.score += game.board[y][j].new_value;
+        } else {
+          game.board[y][j].new_value = src->new_value;
+        }
+        src->new_value = 0;
         game.animating = true;
       }
     }
@@ -319,11 +369,13 @@ void move_up() {
 
   for (int i = 1; i < 4; i++) {
     for (int j = 0; j < 4; j++) {
-      if (game.board[i][j].value == 0) {
+      if (game.board[i][j].new_value == 0) {
         continue;
       }
       u8 tiles_to_move = 0;
       u8 y = i;
+
+      Tile *src = &game.board[i][j];
 
       do {
         y--;
@@ -333,8 +385,9 @@ void move_up() {
           continue;
         }
 
-        if (game.board[y][j].new_value == game.board[i][j].new_value) {
+        if (game.board[y][j].new_value == src->new_value && !game.board[y][j].merged) {
           tiles_to_move++;
+          game.board[y][j].merged = true;
           break;
         } else {
           y++;
@@ -342,118 +395,24 @@ void move_up() {
         }
       } while (y > 0);
 
-      game.board[i][j].tiles_to_move = tiles_to_move;
+      src->tiles_to_move = tiles_to_move;
 
       if (tiles_to_move > 0) {
-        game.board[y][j].new_value = game.board[i][j].value;
-        game.board[i][j].new_value = 0;
+        if (game.board[y][j].merged) {
+          game.board[y][j].new_value *= 2;
+          game.score += game.board[y][j].new_value;
+        } else {
+          game.board[y][j].new_value = src->new_value;
+        }
+        src->new_value = 0;
         game.animating = true;
       }
     }
   }
 }
 
-
-void update_positions(f64 delta_t) {
-  if (game.animating) {
-    switch (game.last_move_dir) {
-      case MOVE_DIR_LEFT:
-        for (int i = 0; i < 4; i++) {
-          for (int j = 1; j < 4; j++) {
-            u8 tiles_to_move = game.board[i][j].tiles_to_move;
-            f32 speed = ANIM_SPEED * tiles_to_move;
-
-            if (game.board[i][j].tiles_to_move != 0) {
-              game.board[i][j].anim_x_offset_relative -= speed * delta_t;
-
-              if (game.board[i][j].anim_x_offset_relative <= -0.240f * (tiles_to_move + (tiles_to_move * 0.02f))) {
-                game.board[i][j].anim_x_offset_relative = -0.240f * (tiles_to_move + (tiles_to_move * 0.02f));
-                game.board[i][j - tiles_to_move].value = game.board[i][j].value;
-                game.board[i][j - tiles_to_move].new_value = game.board[i][j].value;
-                game.board[i][j].value = 0;
-                game.board[i][j].new_value = 0;
-                game.board[i][j].tiles_to_move = 0;
-                game.board[i][j].anim_x_offset_relative = 0;
-                game.animating = false;
-              }
-            }
-          }
-        }
-        break;
-      case MOVE_DIR_RIGHT:
-        for (int i = 0; i < 4; i++) {
-          for (int j = 2; j >= 0; j--) {
-            u8 tiles_to_move = game.board[i][j].tiles_to_move;
-            f32 speed = ANIM_SPEED * tiles_to_move;
-
-            if (game.board[i][j].tiles_to_move != 0) {
-              game.board[i][j].anim_x_offset_relative += speed * delta_t;
-
-              if (game.board[i][j].anim_x_offset_relative >= 0.240f * (tiles_to_move + (tiles_to_move * 0.02f))) {
-                game.board[i][j].anim_x_offset_relative = 0.240f * (tiles_to_move + (tiles_to_move * 0.02f));
-                game.board[i][j + tiles_to_move].value = game.board[i][j].value;
-                game.board[i][j + tiles_to_move].new_value = game.board[i][j].value;
-                game.board[i][j].value = 0;
-                game.board[i][j].new_value = 0;
-                game.board[i][j].tiles_to_move = 0;
-                game.board[i][j].anim_x_offset_relative = 0;
-                game.animating = false;
-              }
-            }
-          }
-        }
-        break;
-      case MOVE_DIR_UP:
-        for (int i = 1; i < 4; i++) {
-          for (int j = 0; j < 4; j++) {
-            u8 tiles_to_move = game.board[i][j].tiles_to_move;
-            f32 speed = ANIM_SPEED * tiles_to_move;
-
-            if (game.board[i][j].tiles_to_move != 0) {
-              game.board[i][j].anim_y_offset_relative -= speed * delta_t;
-
-              if (game.board[i][j].anim_y_offset_relative <= -0.240f * (tiles_to_move + (tiles_to_move * 0.02f))) {
-                game.board[i][j].anim_y_offset_relative = -0.240f * (tiles_to_move + (tiles_to_move * 0.02f));
-                game.board[i - tiles_to_move][j].value = game.board[i][j].value;
-                game.board[i - tiles_to_move][j].new_value = game.board[i][j].value;
-                game.board[i][j].value = 0;
-                game.board[i][j].new_value = 0;
-                game.board[i][j].tiles_to_move = 0;
-                game.board[i][j].anim_y_offset_relative = 0;
-                game.animating = false;
-              }
-            }
-          }
-        }
-        break;
-      case MOVE_DIR_DOWN:
-        for (int i = 2; i >= 0; i--) {
-          for (int j = 0; j < 4; j++) {
-            u8 tiles_to_move = game.board[i][j].tiles_to_move;
-            f32 speed = ANIM_SPEED * tiles_to_move;
-
-            if (game.board[i][j].tiles_to_move != 0) {
-              game.board[i][j].anim_y_offset_relative += speed * delta_t;
-
-              if (game.board[i][j].anim_y_offset_relative >= 0.240f * (tiles_to_move + (tiles_to_move * 0.02f))) {
-                game.board[i][j].anim_y_offset_relative = 0.240f * (tiles_to_move + (tiles_to_move * 0.02f));
-                game.board[i + tiles_to_move][j].value = game.board[i][j].value;
-                game.board[i + tiles_to_move][j].new_value = game.board[i][j].value;
-                game.board[i][j].value = 0;
-                game.board[i][j].new_value = 0;
-                game.board[i][j].tiles_to_move = 0;
-                game.board[i][j].anim_y_offset_relative = 0;
-                game.animating = false;
-              }
-            }
-          }
-        }
-        break;
-    }
-  }
-}
-
 void spawn_new_tile(u8 x, u8 y) {
+  // 90% chance of spawning a 2, 10% chance of spawning a 4
   if (rand() % 10 < 9) {
     game.board[x][y].value = 2;
     game.board[x][y].new_value = 2;
@@ -469,7 +428,7 @@ void spawn_random_tile() {
 
   for (int i = 0; i < 4; i++) {
     for (int j = 0; j <= 3; j++) {
-      if (game.board[i][j].value == 0) {
+      if (game.board[i][j].new_value == 0 && !game.board[i][j].merged) {
         available_tiles[available_tiles_count] = i * 4 + j;
         available_tiles_count++;
       }
@@ -484,21 +443,161 @@ void spawn_random_tile() {
   spawn_new_tile(x, y);
 }
 
+void update_positions(f64 delta_t) {
+  if (game.animating) {
+    switch (game.last_move_dir) {
+      case MOVE_DIR_LEFT:
+        for (int i = 0; i < 4; i++) {
+          for (int j = 1; j < 4; j++) {
+            u8 tiles_to_move = game.board[i][j].tiles_to_move;
+            f32 speed = ANIM_SPEED * tiles_to_move;
+            Tile *src = &game.board[i][j];
+            Tile *dest = &game.board[i][j - tiles_to_move];
+
+            if (src->tiles_to_move != 0) {
+              src->anim_x_offset_relative -= speed * delta_t;
+
+              if (src->anim_x_offset_relative <= -0.240f * (tiles_to_move + (tiles_to_move * 0.02f))) {
+                src->anim_x_offset_relative = -0.240f * (tiles_to_move + (tiles_to_move * 0.02f));
+
+                if (dest->new_value == src->value * 2) {
+                  dest->merged = false;
+                }
+
+                src->value = src->new_value;
+                dest->value = dest->new_value;
+
+                src->tiles_to_move = 0;
+                src->anim_x_offset_relative = 0;
+                game.animating = false;
+                game.spawning_new_tile = true;
+              }
+            }
+          }
+        }
+        break;
+      case MOVE_DIR_RIGHT:
+        for (int i = 0; i < 4; i++) {
+          for (int j = 2; j >= 0; j--) {
+            u8 tiles_to_move = game.board[i][j].tiles_to_move;
+            f32 speed = ANIM_SPEED * tiles_to_move;
+            Tile *src = &game.board[i][j];
+            Tile *dest = &game.board[i][j + tiles_to_move];
+
+            if (src->tiles_to_move != 0) {
+              src->anim_x_offset_relative += speed * delta_t;
+
+              if (src->anim_x_offset_relative >= 0.240f * (tiles_to_move + (tiles_to_move * 0.02f))) {
+                src->anim_x_offset_relative = 0.240f * (tiles_to_move + (tiles_to_move * 0.02f));
+
+                if (dest->new_value == src->value * 2) {
+                  dest->merged = false;
+                }
+
+                src->value = src->new_value;
+                dest->value = dest->new_value;
+
+                src->tiles_to_move = 0;
+                src->anim_x_offset_relative = 0;
+                game.animating = false;
+                game.spawning_new_tile = true;
+              }
+            }
+          }
+        }
+        break;
+      case MOVE_DIR_UP:
+        for (int i = 1; i < 4; i++) {
+          for (int j = 0; j < 4; j++) {
+            u8 tiles_to_move = game.board[i][j].tiles_to_move;
+            f32 speed = ANIM_SPEED * tiles_to_move;
+            Tile *src = &game.board[i][j];
+            Tile *dest = &game.board[i - tiles_to_move][j];
+
+            if (src->tiles_to_move != 0) {
+              src->anim_y_offset_relative -= speed * delta_t;
+
+              if (src->anim_y_offset_relative <= -0.240f * (tiles_to_move + (tiles_to_move * 0.02f))) {
+                src->anim_y_offset_relative = -0.240f * (tiles_to_move + (tiles_to_move * 0.02f));
+
+                if (dest->new_value == src->value * 2) {
+                  dest->merged = false;
+                }
+
+                src->value = src->new_value;
+                dest->value = dest->new_value;
+
+                src->tiles_to_move = 0;
+                src->anim_y_offset_relative = 0;
+                game.animating = false;
+                game.spawning_new_tile = true;
+              }
+            }
+          }
+        }
+        break;
+      case MOVE_DIR_DOWN:
+        for (int i = 2; i >= 0; i--) {
+          for (int j = 0; j < 4; j++) {
+            u8 tiles_to_move = game.board[i][j].tiles_to_move;
+            f32 speed = ANIM_SPEED * tiles_to_move;
+            Tile *src = &game.board[i][j];
+            Tile *dest = &game.board[i + tiles_to_move][j];
+
+            if (src->tiles_to_move != 0) {
+              src->anim_y_offset_relative += speed * delta_t;
+
+              if (src->anim_y_offset_relative >= 0.240f * (tiles_to_move + (tiles_to_move * 0.02f))) {
+                src->anim_y_offset_relative = 0.240f * (tiles_to_move + (tiles_to_move * 0.02f));
+
+                if (dest->new_value == src->value * 2) {
+                  dest->merged = false;
+                }
+
+                src->value = src->new_value;
+                dest->value = dest->new_value;
+
+                src->tiles_to_move = 0;
+                src->anim_y_offset_relative = 0;
+                game.animating = false;
+                game.spawning_new_tile = true;
+              }
+            }
+          }
+        }
+        break;
+    }
+  }
+
+  if (game.spawning_new_tile) {
+    spawn_random_tile();
+    game.spawning_new_tile = false;
+  }
+}
+
+bool gameover() {
+  for (int y = 0; y < 4; y++) {
+    for (int x = 0; x < 4; x++) {
+      if (game.board[y][x].value == 0) {
+        return false;
+      }
+
+      for (int i = 0; i < 4; i++) {
+        u8 new_x = CORE_CLAMP(x + neighbors[i][0], 0, 3);
+        u8 new_y = CORE_CLAMP(y + neighbors[i][1], 0, 3);
+
+        if ((new_y != y || new_x != x) && game.board[y][x].value == game.board[new_y][new_x].value) {
+          return false;
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
 void game_init(void) {
   srand(time(NULL));
-
-  // TODO: this shouldn't merge all of them and instead should
-  // merge every 2 together
-  /* game.board[0][0].value = 2; */
-  /* game.board[0][1].value = 2; */
-  /* game.board[0][2].value = 2; */
-  /* game.board[0][3].value = 2; */
-
-  /* game.board[0][0].new_value = 2; */
-  /* game.board[0][1].new_value = 2; */
-  /* game.board[0][2].new_value = 2; */
-  /* game.board[0][3].new_value = 2; */
-
 
   for (int i = 0; i < 2; i++) {
     spawn_random_tile();
@@ -525,16 +624,12 @@ void handle_keyboard_input(ZephrEvent e) {
     zephr_toggle_fullscreen();
   } else if (e.key.code == ZEPHR_KEYCODE_UP) {
     move_up();
-    /* spawn_random_tile(); */
   } else if (e.key.code == ZEPHR_KEYCODE_DOWN) {
     move_down();
-    /* spawn_random_tile(); */
   } else if (e.key.code == ZEPHR_KEYCODE_LEFT) {
     move_left();
-    /* spawn_random_tile(); */
   } else if (e.key.code == ZEPHR_KEYCODE_RIGHT) {
     move_right();
-    /* spawn_random_tile(); */
   }
 }
 
