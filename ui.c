@@ -9,10 +9,7 @@ Shader ui_shader;
 unsigned int ui_vao;
 unsigned int ui_vbo;
 
-int init_ui(const char* font_path, Size window_size) {
-  zephr_ctx->window.size = window_size;
-  zephr_ctx->projection = orthographic_projection_2d(0.f, window_size.width, window_size.height, 0.f);
-
+int init_ui(const char* font_path) {
   int res = init_fonts(font_path);
   if (res == -1) {
     printf("[ERROR]: could not initialize freetype library\n");
@@ -120,6 +117,11 @@ void set_rotation_constraint(UIConstraints *constraints, float angle_d) {
 void apply_constraints(UIConstraints *constraints, Vec2f *pos, Sizef *size) {
   *pos = (Vec2f){constraints->x, constraints->y};
   *size = (Sizef){constraints->width, constraints->height};
+}
+
+void apply_constraints_rect(UIConstraints *constraints, Rect *rect) {
+  rect->pos = (Vec2f){constraints->x, constraints->y};
+  rect->size = (Sizef){constraints->width, constraints->height};
 }
 
 void apply_alignment(Alignment align, UIConstraints *constraints, Vec2f *pos, Sizef size) {
@@ -267,6 +269,57 @@ void draw_triangle(UIConstraints *constraints, const Color color, Alignment alig
   glDrawArrays(GL_TRIANGLES, 0, 3);
 
   glBindVertexArray(0);
+}
+
+bool inside_rect(Rect *rect, Vec2 *point) {
+  if (point->x >= rect->pos.x && point->x <= rect->pos.x + rect->size.width &&
+      point->y >= rect->pos.y && point->y <= rect->pos.y + rect->size.height) {
+    return true;
+  }
+  return false;
+}
+
+bool draw_button(UIConstraints *constraints, const Color color, const char *text, f32 radius, Alignment align) {
+  Rect rect = {0};
+
+  apply_constraints(constraints, &rect.pos, &rect.size);
+  apply_alignment(align, constraints, &rect.pos, rect.size);
+
+  if (inside_rect(&rect, &zephr_ctx->mouse.pos)) {
+    zephr_set_cursor(ZEPHR_CURSOR_HAND);
+
+    if (zephr_ctx->mouse.pressed) {
+      Color new_color = mult_color(color, 0.8f);
+      draw_quad(constraints, new_color, radius, align);
+    } else {
+      Color new_color = mult_color(color, 0.9f);
+      draw_quad(constraints, new_color, radius, align);
+    }
+  } else {
+    zephr_set_cursor(ZEPHR_CURSOR_ARROW);
+    draw_quad(constraints, color, radius, align);
+  }
+
+  if (text) {
+    UIConstraints text_constraints = {0};
+
+    set_parent_constraint(&text_constraints, constraints);
+    set_x_constraint(&text_constraints, 0, UI_CONSTRAINT_RELATIVE_PIXELS);
+    set_y_constraint(&text_constraints, 0, UI_CONSTRAINT_RELATIVE_PIXELS);
+    set_width_constraint(&text_constraints, 1.5, UI_CONSTRAINT_RELATIVE_PIXELS);
+
+    u8 font_size = (u8)(constraints->width * 0.2 / text_constraints.width * 0.2 * 100.f);
+
+    // TODO: need to adjust the font size based on the text height
+
+    draw_text(text, font_size, text_constraints, COLOR_BLACK, ALIGN_CENTER);
+  }
+
+  if (inside_rect(&rect, &zephr_ctx->mouse.pos) && zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
+    return true;
+  }
+
+  return false;
 }
 
 /* enum Element { */

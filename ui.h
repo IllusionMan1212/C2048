@@ -2,6 +2,11 @@
 
 #include "zephr_math.h"
 
+typedef struct Rect {
+  Vec2f pos;
+  Sizef size;
+} Rect;
+
 typedef enum Alignment {
   ALIGN_TOP_LEFT,
   ALIGN_TOP_CENTER,
@@ -30,7 +35,7 @@ typedef struct UIConstraints {
   struct UIConstraints *parent;
 } UIConstraints;
 
-int init_ui(const char* font_path, Size window_size);
+int init_ui(const char* font_path);
 void set_parent_constraint(UIConstraints *constraints, UIConstraints *parent_constraints);
 void set_x_constraint(UIConstraints *constraints, float value, UIConstraint type);
 void set_y_constraint(UIConstraints *constraints, float value, UIConstraint type);
@@ -42,3 +47,4 @@ void apply_alignment(Alignment align, UIConstraints *constraints, Vec2f *pos, Si
 void draw_quad(UIConstraints *constraints, const Color color, float border_radius, Alignment align);
 void draw_circle(UIConstraints *constraints, const Color color, Alignment align);
 void draw_triangle(UIConstraints *constraints, const Color color, Alignment align);
+bool draw_button(UIConstraints *constraints, const Color color, const char *text, f32 radius, Alignment align);

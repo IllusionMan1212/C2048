@@ -32,7 +32,8 @@ typedef enum ZephrEventType {
   ZEPHR_EVENT_MOUSE_BUTTON_RELEASED,
   ZEPHR_EVENT_MOUSE_SCROLL,
   ZEPHR_EVENT_WINDOW_RESIZED,
-  ZEPHR_EVENT_WINDOW_CLOSED
+  ZEPHR_EVENT_WINDOW_CLOSED,
+  ZEPHR_EVENT_MOUSE_MOVED,
 } ZephrEventType;
 
 typedef enum ZephrMouseScrollDirection {
@@ -52,6 +53,17 @@ typedef enum ZephrMouseButton {
   ZEPHR_MOUSE_BUTTON_6,
   ZEPHR_MOUSE_BUTTON_7,
 } ZephrMouseButton;
+
+typedef enum ZephrCursor {
+  ZEPHR_CURSOR_ARROW,
+  ZEPHR_CURSOR_IBEAM,
+  ZEPHR_CURSOR_CROSSHAIR,
+  ZEPHR_CURSOR_HAND,
+  ZEPHR_CURSOR_HRESIZE,
+  ZEPHR_CURSOR_VRESIZE,
+
+  ZEPHR_CURSOR_COUNT,
+} ZephrCursor;
 
 
 typedef u16 ZephrScancode;
@@ -351,12 +363,22 @@ typedef struct ZephrEvent {
 } ZephrEvent;
 /* CORE_DEFINE_STACK(ZephrEvent); */
 
+typedef struct ZephrMouse {
+  Vec2 pos;
+  bool pressed;
+  bool released;
+  ZephrMouseButton button;
+} ZephrMouse;
+
 typedef struct ZephrContext {
   Atom window_delete_atom;
   bool should_quit;
   Size screen_size;
   ZephrWindow window;
   ZephrFont font;
+  ZephrMouse mouse;
+  ZephrCursor cursor;
+  ZephrCursor cursors[ZEPHR_CURSOR_COUNT];
   /* ZephrKeyboard keyboard; */
   /* XkbDescPtr xkb; */
   /* XIM xim; */
@@ -366,7 +388,7 @@ typedef struct ZephrContext {
   Matrix4x4 projection;
 } ZephrContext;
 
-void zephr_init(const char* font_path, const char* window_title, Size window_size);
+void zephr_init(const char* font_path, const char* icon_path, const char* window_title, Size window_size);
 void zephr_deinit(void);
 bool zephr_should_quit(void);
 void zephr_swap_buffers(void);
@@ -376,6 +398,7 @@ void zephr_toggle_fullscreen(void);
 void zephr_quit(void);
 Color ColorRGBA(u8 r, u8 g, u8 b, u8 a);
 bool zephr_iter_events(ZephrEvent *event_out);
+void zephr_set_cursor(ZephrCursor cursor);
 
 /* bool zephr_keyboard_keycode_is_pressed(ZephrKeycode keycode); */
 /* bool zephr_keyboard_keycode_has_been_pressed(ZephrKeycode keycode); */

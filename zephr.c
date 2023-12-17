@@ -3,7 +3,10 @@
 #include <string.h>
 
 #include <X11/Xatom.h>
+#include <X11/cursorfont.h>
+#include <X11/Xutil.h>
 #include <glad/glx.h>
+#include <stb_image.h>
 
 #include "audio.h"
 #include "core.h"
@@ -484,6 +487,8 @@ void x11_resize_window(void) {
   glViewport(0, 0, win_attrs.width, win_attrs.height);
 }
 
+// BUG: fullscreen doesn't work on gnome. may or may not be related to the window being
+// opened as a dialog window
 void x11_go_fullscreen(void) {
   XEvent xev;
   Atom wm_state = XInternAtom(x11_display, "_NET_WM_STATE", False);
@@ -524,24 +529,59 @@ void x11_toggle_fullscreen(bool fullscreen) {
   }
 }
 
-int x11_create_window(const char* title, int window_width, int window_height) {
+void x11_assign_window_icon(const char *icon_path) {
+  int icon_width, icon_height;
+  unsigned char *icon_data = stbi_load(icon_path, &icon_width, &icon_height, NULL, STBI_rgb_alpha);
+  CORE_ASSERT(icon_data, "Failed to load icon image\n");
+
+  u32 target_size = 2 + icon_width * icon_height;
+
+  u64 *data = malloc(target_size * sizeof(u64));
+  u64 *target = data;
+
+  // first two elements are width and height
+  *target++ = icon_width;
+  *target++ = icon_height;
+
+  for (int i = 0; i < icon_width * icon_height; i++) {
+    *target++ = (icon_data[i * 4] << 16) | (icon_data[i * 4 + 1] << 8) | (icon_data[i * 4 + 2] << 0) | (icon_data[i * 4 + 3] << 24);
+  }
+
+  Atom net_wm_icon = XInternAtom(x11_display, "_NET_WM_ICON", False);
+
+  XChangeProperty(x11_display, x11_window, net_wm_icon, XA_CARDINAL, 32, PropModeReplace, (unsigned char*)data, target_size);
+
+  free(data);
+  stbi_image_free(icon_data);
+}
+
+int x11_create_window(const char* title, int window_width, int window_height, const char *icon_path) {
   x11_display = XOpenDisplay(NULL);
   CORE_ASSERT(x11_display, "Cannot open x11 display connection\n");
 
-  int screen = DefaultScreen(x11_display);
-  Window root = RootWindow(x11_display, screen);
-  Visual *visual = DefaultVisual(x11_display, screen);
+  int screen_num = DefaultScreen(x11_display);
+  Window root = RootWindow(x11_display, screen_num);
+  Visual *visual = DefaultVisual(x11_display, screen_num);
 
   x11_colormap = XCreateColormap(x11_display, root, visual, AllocNone);
 
   XSetWindowAttributes attributes;
   attributes.event_mask = ExposureMask | KeyPressMask | KeyReleaseMask |
-    StructureNotifyMask | ButtonPressMask | ButtonReleaseMask;
+    StructureNotifyMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
   attributes.colormap = x11_colormap;
 
-  x11_window = XCreateWindow(x11_display, root, 0, 0, window_width, window_height, 0,
-      DefaultDepth(x11_display, screen), InputOutput, visual,
+  Screen *screen = DefaultScreenOfDisplay(x11_display);
+
+  int window_start_x = screen->width / 2 - window_width / 2;
+  int window_start_y = screen->height / 2 - window_height / 2;
+
+  x11_window = XCreateWindow(x11_display, root, window_start_x, window_start_y, window_width, window_height, 0,
+      DefaultDepth(x11_display, screen_num), InputOutput, visual,
       CWColormap | CWEventMask, &attributes);
+
+  if (icon_path) {
+    x11_assign_window_icon(icon_path);
+  }
 
   // Hints to the WM that the window is a dialog window which makes it a floating
   // window in tiling WMs (only tested on DWM though)
@@ -554,12 +594,21 @@ int x11_create_window(const char* title, int window_width, int window_height) {
   XSetWMProtocols(x11_display, x11_window, &wm_delete_window, 1);
   zephr_ctx->window_delete_atom = wm_delete_window;
 
-  XMapWindow(x11_display, x11_window);
+  // BUG: window title is broken on gnome's sidebar but works on the window itself.
+  // sidebar shows "Unknown"
   XStoreName(x11_display, x11_window, title);
+  XTextProperty text_property;
+  text_property.value = (unsigned char *)title;
+  text_property.format = 8;
+  text_property.encoding = XA_STRING;
+  text_property.nitems = strlen(title);
+  XSetWMName(x11_display, x11_window, &text_property);
+
+  XMapWindow(x11_display, x11_window);
 
   CORE_ASSERT(x11_window, "Failed to create window\n");
 
-  int glx_version = gladLoaderLoadGLX(x11_display, screen);
+  int glx_version = gladLoaderLoadGLX(x11_display, screen_num);
 
   if (!glx_version) {
     printf("[FATAL] Failed to load GLX\n");
@@ -579,7 +628,7 @@ int x11_create_window(const char* title, int window_width, int window_height) {
 
   int num_fbc = 0;
   GLXFBConfig *fbc =
-    glXChooseFBConfig(x11_display, screen, visual_attributes, &num_fbc);
+    glXChooseFBConfig(x11_display, screen_num, visual_attributes, &num_fbc);
 
   GLint context_attributes[] = {
     GLX_CONTEXT_MAJOR_VERSION_ARB, 3,
@@ -623,8 +672,8 @@ int x11_create_window(const char* title, int window_width, int window_height) {
   return 0;
 }
 
-int x11_init(const char* title, int window_width, int window_height) {
-  int res = x11_create_window(title, window_width, window_height);
+int x11_init(const char* title, int window_width, int window_height, const char *icon_path) {
+  int res = x11_create_window(title, window_width, window_height, icon_path);
 
 	/* // loads the XMODIFIERS environment variable to see what IME to use */
 	/* XSetLocaleModifiers(""); */
@@ -704,18 +753,27 @@ void x11_make_window_non_resizable(int width, int height) {
 ///////////////////////////
 
 
-void zephr_init(const char* font_path, const char* window_title, Size window_size) {
+void zephr_init(const char* font_path, const char* icon_path, const char* window_title, Size window_size) {
   zephr_ctx = malloc(sizeof(ZephrContext));
 
   // TODO: should I initalize the audio here or let the game handle that??
   int res = audio_init();
   CORE_ASSERT(res == 0, "Failed to initialize audio");
 
-  res = x11_init(window_title, window_size.width, window_size.height);
+  res = x11_init(window_title, window_size.width, window_size.height, icon_path);
   CORE_ASSERT(res == 0, "Failed to initialize X11");
 
-  res = init_ui(font_path, (Size){ .width = window_size.width, .height = window_size.height });
+  res = init_ui(font_path);
   CORE_ASSERT(res == 0, "Failed to initialize UI");
+
+  zephr_ctx->window.size = window_size;
+  zephr_ctx->projection = orthographic_projection_2d(0.f, window_size.width, window_size.height, 0.f);
+  zephr_ctx->cursors[ZEPHR_CURSOR_ARROW] = XCreateFontCursor(x11_display, XC_left_ptr);
+  zephr_ctx->cursors[ZEPHR_CURSOR_IBEAM] = XCreateFontCursor(x11_display, XC_xterm);
+  zephr_ctx->cursors[ZEPHR_CURSOR_CROSSHAIR] = XCreateFontCursor(x11_display, XC_crosshair);
+  zephr_ctx->cursors[ZEPHR_CURSOR_HAND] = XCreateFontCursor(x11_display, XC_hand1);
+  zephr_ctx->cursors[ZEPHR_CURSOR_HRESIZE] = XCreateFontCursor(x11_display, XC_sb_h_double_arrow);
+  zephr_ctx->cursors[ZEPHR_CURSOR_VRESIZE] = XCreateFontCursor(x11_display, XC_sb_v_double_arrow);
 
   x11_get_screen_size(&zephr_ctx->screen_size.width, &zephr_ctx->screen_size.height);
   start_internal_timer();
@@ -741,6 +799,8 @@ bool zephr_should_quit(void) {
 void zephr_swap_buffers(void) {
   CORE_DEBUG_ASSERT(zephr_ctx, "Zephr context not initialized");
 
+  zephr_ctx->mouse.released = false;
+
   glXSwapBuffers(x11_display, x11_window);
 }
 
@@ -748,7 +808,7 @@ Size zephr_get_window_size(void) {
   return zephr_ctx->window.size;
 }
 
-// This MUST be called after calling init_zephr()
+// This MUST be called after calling zephr_init()
 void zephr_make_window_non_resizable(void) {
   CORE_DEBUG_ASSERT(zephr_ctx, "Zephr context not initialized");
 
@@ -901,16 +961,20 @@ bool zephr_iter_events(ZephrEvent *event_out) {
     } else if (xev.type == ButtonPress) {
       event_out->type = ZEPHR_EVENT_MOUSE_BUTTON_PRESSED;
       event_out->mouse.position = (Vec2){ .x = xev.xbutton.x, .y = xev.xbutton.y };
+      zephr_ctx->mouse.pressed = true;
 
       switch (xev.xbutton.button) {
         case Button1:
           event_out->mouse.button = ZEPHR_MOUSE_BUTTON_LEFT;
+          zephr_ctx->mouse.button = ZEPHR_MOUSE_BUTTON_LEFT;
           break;
         case Button2:
           event_out->mouse.button = ZEPHR_MOUSE_BUTTON_MIDDLE;
+          zephr_ctx->mouse.button = ZEPHR_MOUSE_BUTTON_MIDDLE;
           break;
         case Button3:
           event_out->mouse.button = ZEPHR_MOUSE_BUTTON_RIGHT;
+          zephr_ctx->mouse.button = ZEPHR_MOUSE_BUTTON_RIGHT;
           break;
         case Button4:
           event_out->type = ZEPHR_EVENT_MOUSE_SCROLL;
@@ -922,9 +986,11 @@ bool zephr_iter_events(ZephrEvent *event_out) {
           break;
         case 8: // Back
           event_out->mouse.button = ZEPHR_MOUSE_BUTTON_BACK;
+          zephr_ctx->mouse.button = ZEPHR_MOUSE_BUTTON_BACK;
           break;
         case 9: // Forward
           event_out->mouse.button = ZEPHR_MOUSE_BUTTON_FORWARD;
+          zephr_ctx->mouse.button = ZEPHR_MOUSE_BUTTON_FORWARD;
           break;
         default:
           printf("[WARN] Unknown mouse button pressed: %d\n", xev.xbutton.button);
@@ -935,6 +1001,8 @@ bool zephr_iter_events(ZephrEvent *event_out) {
     } else if (xev.type == ButtonRelease) {
       event_out->type = ZEPHR_EVENT_MOUSE_BUTTON_RELEASED;
       event_out->mouse.position = (Vec2){ .x = xev.xbutton.x, .y = xev.xbutton.y };
+      zephr_ctx->mouse.released = true;
+      zephr_ctx->mouse.pressed = false;
 
       switch (xev.xbutton.button) {
         case Button1:
@@ -957,10 +1025,47 @@ bool zephr_iter_events(ZephrEvent *event_out) {
       XRefreshKeyboardMapping(&xev.xmapping);
       /* x11_keyboard_map_update(); */
       break;
+    } else if (xev.type == MotionNotify) {
+      event_out->type = ZEPHR_EVENT_MOUSE_MOVED;
+      event_out->mouse.position = (Vec2){ .x = xev.xmotion.x, .y = xev.xmotion.y };
+      zephr_ctx->mouse.pos = event_out->mouse.position;
+      return true;
     }
   }
 
   return false;
+}
+
+void zephr_set_cursor(ZephrCursor cursor) {
+  if (zephr_ctx->cursor == cursor) {
+    return;
+  }
+
+  zephr_ctx->cursor = cursor;
+
+  switch (cursor) {
+    case ZEPHR_CURSOR_ARROW:
+      XDefineCursor(x11_display, x11_window, zephr_ctx->cursors[ZEPHR_CURSOR_ARROW]);
+      break;
+    case ZEPHR_CURSOR_IBEAM:
+      XDefineCursor(x11_display, x11_window, zephr_ctx->cursors[ZEPHR_CURSOR_IBEAM]);
+      break;
+    case ZEPHR_CURSOR_CROSSHAIR:
+      XDefineCursor(x11_display, x11_window, zephr_ctx->cursors[ZEPHR_CURSOR_CROSSHAIR]);
+      break;
+    case ZEPHR_CURSOR_HAND:
+      XDefineCursor(x11_display, x11_window, zephr_ctx->cursors[ZEPHR_CURSOR_HAND]);
+      break;
+    case ZEPHR_CURSOR_HRESIZE:
+      XDefineCursor(x11_display, x11_window, zephr_ctx->cursors[ZEPHR_CURSOR_HRESIZE]);
+      break;
+    case ZEPHR_CURSOR_VRESIZE:
+      XDefineCursor(x11_display, x11_window, zephr_ctx->cursors[ZEPHR_CURSOR_VRESIZE]);
+      break;
+    default :
+      XDefineCursor(x11_display, x11_window, zephr_ctx->cursors[ZEPHR_CURSOR_ARROW]);
+      break;
+  }
 }
 
 /* bool zephr_keyboard_scancode_is_pressed(ZephrScancode scancode) { */
