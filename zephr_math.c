@@ -74,7 +74,7 @@ void apply_translation(Matrix4x4 *matrix, Vec2f pos) {
   mult_4x4(matrix, &temp);
 }
 
-Color mul_color(Color color, float amount) {
+Color mult_color(Color color, float amount) {
   Color result = color;
 
   result.r = CORE_CLAMP((u8)((float)result.r * amount), 0, 255);

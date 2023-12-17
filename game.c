@@ -144,11 +144,13 @@ void draw_board() {
   set_y_constraint(&board_con, 0.05f, UI_CONSTRAINT_RELATIVE);
   set_height_constraint(&board_con, 0.6f, UI_CONSTRAINT_RELATIVE);
   set_width_constraint(&board_con, 1, UI_CONSTRAINT_ASPECT_RATIO);
-  draw_quad(&board_con, ColorRGBA(140, 154, 147, 255), 8, ALIGN_CENTER);
+  const float board_border_radius = board_con.width * 0.02f;
+  draw_quad(&board_con, ColorRGBA(140, 154, 147, 255), board_border_radius, ALIGN_CENTER);
 
   // empty tiles
   const float tile_padding = board_con.width * 0.02f;
   const float tile_height = board_con.height * 0.225f;
+  const float tile_board_radius = tile_height * 0.15f;
 
   UIConstraints empty_tile_con = {0};
   set_parent_constraint(&empty_tile_con, &board_con);
@@ -159,7 +161,7 @@ void draw_board() {
     set_y_constraint(&empty_tile_con, (tile_height + tile_padding) * i + tile_padding, UI_CONSTRAINT_FIXED);
     for (int j = 0; j < 4; j++) {
       set_x_constraint(&empty_tile_con, (tile_height + tile_padding) * j + tile_padding, UI_CONSTRAINT_FIXED);
-      draw_quad(&empty_tile_con, ColorRGBA(120, 133, 126, 255), 16, ALIGN_TOP_LEFT);
+      draw_quad(&empty_tile_con, ColorRGBA(120, 133, 126, 255), tile_board_radius, ALIGN_TOP_LEFT);
     }
   }
 
@@ -179,7 +181,7 @@ void draw_board() {
       set_y_constraint(&tile_con, (f32)((tile_height + tile_padding) * i + tile_padding + game.board[i][j].anim_y_offset_relative * board_con.height), UI_CONSTRAINT_FIXED);
       set_x_constraint(&tile_con, (f32)((tile_height + tile_padding) * j + tile_padding + game.board[i][j].anim_x_offset_relative * board_con.height), UI_CONSTRAINT_FIXED);
       if (tile->value > 0) {
-        draw_quad(&tile_con, tile_color, 16, ALIGN_TOP_LEFT);
+        draw_quad(&tile_con, tile_color, tile_board_radius, ALIGN_TOP_LEFT);
 
         // value text
         set_parent_constraint(&text_con, &tile_con);

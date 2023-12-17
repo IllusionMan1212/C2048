@@ -54,4 +54,4 @@ void apply_scale(Matrix4x4 *matrix, Sizef scale);
 void apply_rotation(Matrix4x4 *model, float angle);
 void apply_translation(Matrix4x4 *matrix, Vec2f pos);
 Matrix4x4 orthographic_projection_2d(float left, float right, float bottom, float top);
-Color mul_color(Color color, float amount);
+Color mult_color(Color color, float amount);
