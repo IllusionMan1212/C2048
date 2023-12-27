@@ -341,7 +341,8 @@ void draw_texture(UIConstraints *constraints, const TextureId texture_id, const 
   set_bool(ui_shader, "hasTexture", false);
 }
 
-bool draw_button(UIConstraints *constraints, const Color color, const char *text, f32 radius, Alignment align) {
+bool draw_button(UIConstraints *constraints, const Color color, const char *text, f32 radius, Alignment align, ButtonState state) {
+  Color text_color = COLOR_BLACK;
   Rect rect = {0};
 
   apply_constraints(constraints, &rect.pos, &rect.size);
@@ -350,7 +351,7 @@ bool draw_button(UIConstraints *constraints, const Color color, const char *text
   bool is_hovered = inside_rect(&rect, &zephr_ctx->mouse.pos);
   bool left_mouse_pressed = zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT;
 
-  if (is_hovered) {
+  if (is_hovered && state == BUTTON_STATE_ACTIVE) {
     zephr_set_cursor(ZEPHR_CURSOR_HAND);
 
     if (left_mouse_pressed) {
@@ -360,6 +361,15 @@ bool draw_button(UIConstraints *constraints, const Color color, const char *text
       Color new_color = mult_color(color, 0.9f);
       draw_quad(constraints, new_color, radius, align);
     }
+  } else if (state == BUTTON_STATE_DISABLED) {
+    if (is_hovered) {
+      zephr_set_cursor(ZEPHR_CURSOR_DISABLED);
+    }
+
+    Color new_color = color;
+    new_color.a = 100;
+    text_color.a = 100;
+    draw_quad(constraints, new_color, radius, align);
   } else {
     draw_quad(constraints, color, radius, align);
   }
@@ -376,17 +386,17 @@ bool draw_button(UIConstraints *constraints, const Color color, const char *text
 
     // TODO: need to adjust the font size based on the text height
 
-    draw_text(text, font_size, text_constraints, COLOR_BLACK, ALIGN_CENTER);
+    draw_text(text, font_size, text_constraints, text_color, ALIGN_CENTER);
   }
 
-  if (is_hovered && zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
+  if (is_hovered && state == BUTTON_STATE_ACTIVE && zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
     return true;
   }
 
   return false;
 }
 
-bool draw_icon_button(UIConstraints *constraints, Color btn_color, const TextureId icon_tex_id, f32 radius, Alignment align) {
+bool draw_icon_button(UIConstraints *constraints, Color btn_color, const TextureId icon_tex_id, f32 radius, Alignment align, ButtonState state) {
   CORE_DEBUG_ASSERT(icon_tex_id, "draw_icon_button() requires that you provide an icon texture");
 
   Rect rect = {0};
@@ -398,7 +408,7 @@ bool draw_icon_button(UIConstraints *constraints, Color btn_color, const Texture
   bool is_hovered = inside_rect(&rect, &zephr_ctx->mouse.pos);
   bool left_mouse_pressed = zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT;
 
-  if (is_hovered) {
+  if (is_hovered && state == BUTTON_STATE_ACTIVE) {
     zephr_set_cursor(ZEPHR_CURSOR_HAND);
 
     if (left_mouse_pressed) {
@@ -408,6 +418,13 @@ bool draw_icon_button(UIConstraints *constraints, Color btn_color, const Texture
       btn_color = mult_color(btn_color, 0.9f);
       icon_color = mult_color(icon_color, 0.9f);
     }
+  } else if (state == BUTTON_STATE_DISABLED) {
+    if (is_hovered) {
+      zephr_set_cursor(ZEPHR_CURSOR_DISABLED);
+    }
+
+    icon_color.a = 100;
+    btn_color.a = 100;
   }
 
   draw_quad(constraints, btn_color, radius, align);
@@ -421,7 +438,7 @@ bool draw_icon_button(UIConstraints *constraints, Color btn_color, const Texture
   set_height_constraint(&icon_constraints, constraints->height * 0.8f, UI_CONSTRAINT_FIXED);
   draw_texture(&icon_constraints, icon_tex_id, icon_color, 0, ALIGN_CENTER);
 
-  if (is_hovered && zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
+  if (is_hovered && state == BUTTON_STATE_ACTIVE && zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
     return true;
   }
 

@@ -4,6 +4,7 @@
 
 #include <X11/Xatom.h>
 #include <X11/cursorfont.h>
+#include <X11/Xcursor/Xcursor.h>
 #include <X11/Xutil.h>
 #include <glad/glx.h>
 #include <stb_image.h>
@@ -770,12 +771,15 @@ void zephr_init(const char* font_path, const char* icon_path, const char* window
 
   zephr_ctx->window.size = window_size;
   zephr_ctx->projection = orthographic_projection_2d(0.f, window_size.width, window_size.height, 0.f);
+
   zephr_ctx->cursors[ZEPHR_CURSOR_ARROW] = XCreateFontCursor(x11_display, XC_left_ptr);
   zephr_ctx->cursors[ZEPHR_CURSOR_IBEAM] = XCreateFontCursor(x11_display, XC_xterm);
   zephr_ctx->cursors[ZEPHR_CURSOR_CROSSHAIR] = XCreateFontCursor(x11_display, XC_crosshair);
   zephr_ctx->cursors[ZEPHR_CURSOR_HAND] = XCreateFontCursor(x11_display, XC_hand1);
   zephr_ctx->cursors[ZEPHR_CURSOR_HRESIZE] = XCreateFontCursor(x11_display, XC_sb_h_double_arrow);
   zephr_ctx->cursors[ZEPHR_CURSOR_VRESIZE] = XCreateFontCursor(x11_display, XC_sb_v_double_arrow);
+
+  zephr_ctx->cursors[ZEPHR_CURSOR_DISABLED] = XcursorLibraryLoadCursor(x11_display, "crossed_circle");
 
   x11_get_screen_size(&zephr_ctx->screen_size.width, &zephr_ctx->screen_size.height);
   start_internal_timer();

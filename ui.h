@@ -36,6 +36,12 @@ typedef struct UIConstraints {
   struct UIConstraints *parent;
 } UIConstraints;
 
+typedef enum ButtonState {
+  BUTTON_STATE_ACTIVE,
+  BUTTON_STATE_INACTIVE,
+  BUTTON_STATE_DISABLED,
+} ButtonState;
+
 int init_ui(const char* font_path);
 void set_parent_constraint(UIConstraints *constraints, UIConstraints *parent_constraints);
 void set_x_constraint(UIConstraints *constraints, float value, UIConstraint type);
@@ -48,5 +54,5 @@ void apply_alignment(Alignment align, UIConstraints *constraints, Vec2f *pos, Si
 void draw_quad(UIConstraints *constraints, const Color color, float border_radius, Alignment align);
 void draw_circle(UIConstraints *constraints, const Color color, Alignment align);
 void draw_triangle(UIConstraints *constraints, const Color color, Alignment align);
-bool draw_button(UIConstraints *constraints, Color color, const char *text, f32 radius, Alignment align);
-bool draw_icon_button(UIConstraints *constraints, Color color, const TextureId icon_tex_id, f32 radius, Alignment align);
+bool draw_button(UIConstraints *constraints, Color color, const char *text, f32 radius, Alignment align, ButtonState state);
+bool draw_icon_button(UIConstraints *constraints, Color color, const TextureId icon_tex_id, f32 radius, Alignment align, ButtonState state);

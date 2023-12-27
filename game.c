@@ -122,7 +122,7 @@ u8 get_tile_font_size(Tile tile) {
 ///////////////////////////////////
 
 
-void draw_bg() {
+void draw_bg(void) {
   Size window_size = zephr_get_window_size();
   UIConstraints board_con = {0};
 
@@ -153,20 +153,58 @@ void draw_bg() {
   draw_text(score, 40, text_con, COLOR_BLACK, ALIGN_TOP_LEFT);
 }
 
-void draw_ui() {
+void draw_quit_dialog(void) {
+  UIConstraints dialog_con = {0};
+  set_x_constraint(&dialog_con, 0, UI_CONSTRAINT_FIXED);
+  set_y_constraint(&dialog_con, 0, UI_CONSTRAINT_FIXED);
+  set_width_constraint(&dialog_con, 1.f, UI_CONSTRAINT_RELATIVE);
+  set_height_constraint(&dialog_con, 1.f, UI_CONSTRAINT_RELATIVE);
+  draw_quad(&dialog_con, ColorRGBA(0, 0, 0, 200), 0, ALIGN_CENTER);
+
+  set_width_constraint(&dialog_con, 0.4f, UI_CONSTRAINT_RELATIVE);
+  set_height_constraint(&dialog_con, 0.2f, UI_CONSTRAINT_RELATIVE);
+  draw_quad(&dialog_con, ColorRGBA(135, 124, 124, 255), 8, ALIGN_CENTER);
+
+  UIConstraints text_con = {0};
+  set_parent_constraint(&text_con, &dialog_con);
+  set_x_constraint(&text_con, 0, UI_CONSTRAINT_FIXED);
+  set_y_constraint(&text_con, -0.04f, UI_CONSTRAINT_RELATIVE);
+  set_width_constraint(&text_con, 1, UI_CONSTRAINT_RELATIVE_PIXELS);
+  draw_text("Are you sure you want to quit?", 36.f, text_con, COLOR_WHITE, ALIGN_CENTER);
+
+  UIConstraints btn_con = {0};
+  set_parent_constraint(&btn_con, &dialog_con);
+  set_width_constraint(&btn_con, 0.1f, UI_CONSTRAINT_RELATIVE);
+  set_height_constraint(&btn_con, 0.05f, UI_CONSTRAINT_RELATIVE);
+  set_y_constraint(&btn_con, -0.02f, UI_CONSTRAINT_RELATIVE);
+  set_x_constraint(&btn_con, -0.07f, UI_CONSTRAINT_RELATIVE);
+  if (draw_button(&btn_con, ColorRGBA(201, 146, 126, 255), "Yes", btn_con.height * 0.20f, ALIGN_BOTTOM_CENTER, BUTTON_STATE_ACTIVE)) {
+    game.quit_dialog = false;
+    zephr_quit();
+  }
+
+  set_y_constraint(&btn_con, -0.02f, UI_CONSTRAINT_RELATIVE);
+  set_x_constraint(&btn_con, 0.07f, UI_CONSTRAINT_RELATIVE);
+  if (draw_button(&btn_con, ColorRGBA(201, 146, 126, 255), "No", btn_con.height * 0.20f, ALIGN_BOTTOM_CENTER, BUTTON_STATE_ACTIVE)) {
+    game.quit_dialog = false;
+  }
+}
+
+void draw_ui(void) {
+  ButtonState bg_btns_state = game.quit_dialog ? BUTTON_STATE_INACTIVE : BUTTON_STATE_ACTIVE;
   UIConstraints btn_con = {0};
 
   set_x_constraint(&btn_con, -8, UI_CONSTRAINT_RELATIVE_PIXELS);
   set_y_constraint(&btn_con, 8, UI_CONSTRAINT_RELATIVE_PIXELS);
-  set_width_constraint(&btn_con, 100, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_width_constraint(&btn_con, 80, UI_CONSTRAINT_RELATIVE_PIXELS);
   set_height_constraint(&btn_con, 1, UI_CONSTRAINT_ASPECT_RATIO);
 
-  if (draw_icon_button(&btn_con, ColorRGBA(201, 146, 126, 255), game.icon_textures[HELP_ICON], btn_con.height * 0.25f, ALIGN_TOP_RIGHT)) {
+  if (draw_icon_button(&btn_con, ColorRGBA(201, 146, 126, 255), game.icon_textures[HELP_ICON], btn_con.height * 0.15f, ALIGN_TOP_RIGHT, bg_btns_state)) {
     printf("help\n");
   }
 
   set_x_constraint(&btn_con, -8 - btn_con.width - 10, UI_CONSTRAINT_RELATIVE_PIXELS);
-  if (draw_icon_button(&btn_con, ColorRGBA(201, 146, 126, 255), game.icon_textures[SETTINGS_ICON], btn_con.height * 0.25f, ALIGN_TOP_RIGHT)) {
+  if (draw_icon_button(&btn_con, ColorRGBA(201, 146, 126, 255), game.icon_textures[SETTINGS_ICON], btn_con.height * 0.15f, ALIGN_TOP_RIGHT, bg_btns_state)) {
     printf("settings\n");
   }
 
@@ -174,12 +212,16 @@ void draw_ui() {
   set_y_constraint(&btn_con, -0.05f, UI_CONSTRAINT_RELATIVE);
   set_width_constraint(&btn_con, 200, UI_CONSTRAINT_RELATIVE_PIXELS);
   set_height_constraint(&btn_con, 65, UI_CONSTRAINT_RELATIVE_PIXELS);
-  if (draw_button(&btn_con, ColorRGBA(201, 172, 126, 255), "New Game", btn_con.height * 0.25f, ALIGN_BOTTOM_CENTER)) {
+  if (draw_button(&btn_con, ColorRGBA(201, 172, 126, 255), "New Game", btn_con.height * 0.25f, ALIGN_BOTTOM_CENTER, bg_btns_state)) {
     printf("new game\n");
+  }
+
+  if (game.quit_dialog) {
+    draw_quit_dialog();
   }
 }
 
-void draw_board() {
+void draw_board(void) {
   // board
   UIConstraints board_con = {0};
   set_y_constraint(&board_con, 0.05f, UI_CONSTRAINT_RELATIVE);
@@ -237,6 +279,7 @@ void draw_board() {
   }
 }
 
+
 ///////////////////////////////////
 //
 //
@@ -245,7 +288,7 @@ void draw_board() {
 //
 ///////////////////////////////////
 
-void move_right() {
+void move_right(void) {
   if (game.animating) return;
   game.last_move_dir = MOVE_DIR_RIGHT;
 
@@ -296,7 +339,7 @@ void move_right() {
   }
 }
 
-void move_left() {
+void move_left(void) {
   if (game.animating) return;
   game.last_move_dir = MOVE_DIR_LEFT;
 
@@ -348,7 +391,7 @@ void move_left() {
 
 }
 
-void move_down() {
+void move_down(void) {
   if (game.animating) return;
   game.last_move_dir = MOVE_DIR_DOWN;
 
@@ -396,7 +439,7 @@ void move_down() {
   }
 }
 
-void move_up() {
+void move_up(void) {
   if (game.animating) return;
   game.last_move_dir = MOVE_DIR_UP;
 
@@ -455,7 +498,7 @@ void spawn_new_tile(u8 x, u8 y) {
   }
 }
 
-void spawn_random_tile() {
+void spawn_random_tile(void) {
   u8 available_tiles_count = 0;
   u8 available_tiles[16];
 
@@ -608,7 +651,7 @@ void update_positions(f64 delta_t) {
   }
 }
 
-bool gameover() {
+bool gameover(void) {
   for (int y = 0; y < 4; y++) {
     for (int x = 0; x < 4; x++) {
       if (game.board[y][x].value == 0) {
@@ -650,22 +693,26 @@ void game_init(void) {
 
 
 void handle_keyboard_input(ZephrEvent e) {
-  if (
-      (e.key.mods & ZEPHR_KEY_MOD_CTRL && e.key.code == ZEPHR_KEYCODE_Q) ||
-      e.key.code == ZEPHR_KEYCODE_ESCAPE
-     ) {
-    // TODO: show confirmation dialog
-    zephr_quit();
+  if (e.key.mods & ZEPHR_KEY_MOD_CTRL && e.key.code == ZEPHR_KEYCODE_Q) {
+    game.quit_dialog = true;
+  } else if (e.key.code == ZEPHR_KEYCODE_ESCAPE) {
+    if (game.quit_dialog) {
+      game.quit_dialog = false;
+    }
   } else if (e.key.code == ZEPHR_KEYCODE_F11) {
     zephr_toggle_fullscreen();
   } else if (e.key.code == ZEPHR_KEYCODE_UP) {
-    move_up();
+    if (!game.quit_dialog)
+      move_up();
   } else if (e.key.code == ZEPHR_KEYCODE_DOWN) {
-    move_down();
+    if (!game.quit_dialog)
+      move_down();
   } else if (e.key.code == ZEPHR_KEYCODE_LEFT) {
-    move_left();
+    if (!game.quit_dialog)
+      move_left();
   } else if (e.key.code == ZEPHR_KEYCODE_RIGHT) {
-    move_right();
+    if (!game.quit_dialog)
+      move_right();
   }
 }
 
@@ -680,7 +727,11 @@ void game_loop(void) {
     while (zephr_iter_events(&e)) {
       switch (e.type) {
         case ZEPHR_EVENT_WINDOW_CLOSED:
-          zephr_quit();
+          if (game.quit_dialog) {
+            zephr_quit();
+          } else {
+            game.quit_dialog = true;
+          }
           break;
         case ZEPHR_EVENT_KEY_PRESSED:
           handle_keyboard_input(e);
@@ -696,8 +747,8 @@ void game_loop(void) {
 
     update_positions(delta_t);
     draw_bg();
-    draw_ui();
     draw_board();
+    draw_ui();
 
     zephr_swap_buffers();
   }

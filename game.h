@@ -29,13 +29,14 @@ typedef struct Tile {
 
 typedef struct Game {
     Tile board[4][4];
+    u32 score;
     MoveDir last_move_dir;
     bool animating;
     bool spawning_new_tile;
     bool game_over;
-    u32 score;
 
     TextureId icon_textures[ICON_TEXTURE_COUNT];
+    bool quit_dialog;
 } Game;
 
 void draw_board(void);
