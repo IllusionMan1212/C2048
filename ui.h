@@ -1,5 +1,6 @@
 #pragma once
 
+#include "texture.h"
 #include "zephr_math.h"
 
 typedef struct Rect {
@@ -47,4 +48,5 @@ void apply_alignment(Alignment align, UIConstraints *constraints, Vec2f *pos, Si
 void draw_quad(UIConstraints *constraints, const Color color, float border_radius, Alignment align);
 void draw_circle(UIConstraints *constraints, const Color color, Alignment align);
 void draw_triangle(UIConstraints *constraints, const Color color, Alignment align);
-bool draw_button(UIConstraints *constraints, const Color color, const char *text, f32 radius, Alignment align);
+bool draw_button(UIConstraints *constraints, Color color, const char *text, f32 radius, Alignment align);
+bool draw_icon_button(UIConstraints *constraints, Color color, const TextureId icon_tex_id, f32 radius, Alignment align);

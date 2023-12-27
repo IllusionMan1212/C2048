@@ -7,6 +7,9 @@ uniform vec4 aColor;
 uniform float borderRadius;
 uniform float uiWidth;
 uniform float uiHeight;
+uniform bool hasTexture;
+
+uniform sampler2D tex;
 
 const float smoothness = 1.0;
 
@@ -29,5 +32,9 @@ void main() {
     }
   }
 
-  FragColor = vec4(aColor.rgb, alpha);
+  if (hasTexture) {
+    FragColor = texture(tex, v_TexCoords) * vec4(aColor.rgb, alpha);
+  } else {
+    FragColor = vec4(aColor.rgb, alpha);
+  }
 }

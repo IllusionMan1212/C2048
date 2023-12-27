@@ -10,6 +10,13 @@ typedef enum MoveDir {
     MOVE_DIR_RIGHT,
 } MoveDir;
 
+typedef enum IconTexture {
+    HELP_ICON,
+    SETTINGS_ICON,
+
+    ICON_TEXTURE_COUNT,
+} IconTexture;
+
 typedef struct Tile {
     u16 value;
     u16 new_value;
@@ -27,6 +34,8 @@ typedef struct Game {
     bool spawning_new_tile;
     bool game_over;
     u32 score;
+
+    TextureId icon_textures[ICON_TEXTURE_COUNT];
 } Game;
 
 void draw_board(void);

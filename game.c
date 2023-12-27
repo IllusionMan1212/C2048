@@ -122,7 +122,7 @@ u8 get_tile_font_size(Tile tile) {
 ///////////////////////////////////
 
 
-void draw_board() {
+void draw_bg() {
   Size window_size = zephr_get_window_size();
   UIConstraints board_con = {0};
 
@@ -132,7 +132,7 @@ void draw_board() {
   // bg
   draw_quad(&board_con, ColorRGBA(248, 250, 230, 255), 0, ALIGN_TOP_LEFT);
 
-  // text
+  // 2048 text
   UIConstraints text_con = {0};
 
   set_y_constraint(&text_con, 0.05f, UI_CONSTRAINT_RELATIVE);
@@ -140,7 +140,48 @@ void draw_board() {
 
   draw_text("2048", 100, text_con, ColorRGBA(34, 234, 82, 155), ALIGN_TOP_CENTER);
 
+  // score
+  char score[16];
+  sprintf(score, "%d", game.score);
+
+  set_parent_constraint(&text_con, NULL);
+  set_x_constraint(&text_con, 0.05f, UI_CONSTRAINT_RELATIVE);
+  set_y_constraint(&text_con, 0.8f, UI_CONSTRAINT_RELATIVE);
+  draw_text("Score", 40, text_con, COLOR_BLACK, ALIGN_TOP_LEFT);
+
+  set_x_constraint(&text_con, 0.15f, UI_CONSTRAINT_RELATIVE);
+  draw_text(score, 40, text_con, COLOR_BLACK, ALIGN_TOP_LEFT);
+}
+
+void draw_ui() {
+  UIConstraints btn_con = {0};
+
+  set_x_constraint(&btn_con, -8, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_y_constraint(&btn_con, 8, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_width_constraint(&btn_con, 100, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_height_constraint(&btn_con, 1, UI_CONSTRAINT_ASPECT_RATIO);
+
+  if (draw_icon_button(&btn_con, ColorRGBA(201, 146, 126, 255), game.icon_textures[HELP_ICON], btn_con.height * 0.25f, ALIGN_TOP_RIGHT)) {
+    printf("help\n");
+  }
+
+  set_x_constraint(&btn_con, -8 - btn_con.width - 10, UI_CONSTRAINT_RELATIVE_PIXELS);
+  if (draw_icon_button(&btn_con, ColorRGBA(201, 146, 126, 255), game.icon_textures[SETTINGS_ICON], btn_con.height * 0.25f, ALIGN_TOP_RIGHT)) {
+    printf("settings\n");
+  }
+
+  set_x_constraint(&btn_con, 0, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_y_constraint(&btn_con, -0.05f, UI_CONSTRAINT_RELATIVE);
+  set_width_constraint(&btn_con, 200, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_height_constraint(&btn_con, 65, UI_CONSTRAINT_RELATIVE_PIXELS);
+  if (draw_button(&btn_con, ColorRGBA(201, 172, 126, 255), "New Game", btn_con.height * 0.25f, ALIGN_BOTTOM_CENTER)) {
+    printf("new game\n");
+  }
+}
+
+void draw_board() {
   // board
+  UIConstraints board_con = {0};
   set_y_constraint(&board_con, 0.05f, UI_CONSTRAINT_RELATIVE);
   set_height_constraint(&board_con, 0.6f, UI_CONSTRAINT_RELATIVE);
   set_width_constraint(&board_con, 1, UI_CONSTRAINT_ASPECT_RATIO);
@@ -166,6 +207,8 @@ void draw_board() {
   }
 
   // filled tiles
+  UIConstraints text_con = {0};
+  set_width_constraint(&text_con, 1.5, UI_CONSTRAINT_RELATIVE_PIXELS);
   UIConstraints tile_con = {0};
   set_parent_constraint(&tile_con, &board_con);
   set_height_constraint(&tile_con, tile_height, UI_CONSTRAINT_FIXED);
@@ -188,22 +231,10 @@ void draw_board() {
         set_x_constraint(&text_con, 0, UI_CONSTRAINT_FIXED);
         set_y_constraint(&text_con, 0, UI_CONSTRAINT_FIXED);
 
-        draw_text(value, get_tile_font_size(*tile), text_con, mul_color(tile_color, 0.5), ALIGN_CENTER);
+        draw_text(value, get_tile_font_size(*tile), text_con, mult_color(tile_color, 0.5), ALIGN_CENTER);
       }
     }
   }
-
-  // score
-  char score[16];
-  sprintf(score, "%d", game.score);
-
-  set_parent_constraint(&text_con, NULL);
-  set_x_constraint(&text_con, 0.05f, UI_CONSTRAINT_RELATIVE);
-  set_y_constraint(&text_con, 0.8f, UI_CONSTRAINT_RELATIVE);
-  draw_text("Score", 40, text_con, COLOR_BLACK, ALIGN_TOP_LEFT);
-
-  set_x_constraint(&text_con, 0.15f, UI_CONSTRAINT_RELATIVE);
-  draw_text(score, 40, text_con, COLOR_BLACK, ALIGN_TOP_LEFT);
 }
 
 ///////////////////////////////////
@@ -601,6 +632,9 @@ bool gameover() {
 void game_init(void) {
   srand(time(NULL));
 
+  game.icon_textures[HELP_ICON] = load_texture("assets/icons/help.png");
+  game.icon_textures[SETTINGS_ICON] = load_texture("assets/icons/settings.png");
+
   for (int i = 0; i < 2; i++) {
     spawn_random_tile();
   }
@@ -661,6 +695,8 @@ void game_loop(void) {
     last_frame = now;
 
     update_positions(delta_t);
+    draw_bg();
+    draw_ui();
     draw_board();
 
     zephr_swap_buffers();

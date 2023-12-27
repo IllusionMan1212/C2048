@@ -529,6 +529,8 @@ void x11_toggle_fullscreen(bool fullscreen) {
   }
 }
 
+// TODO: currently the icon shows on gnome's sidebar correctly but not in gnome-system-monitor.
+// investigate.
 void x11_assign_window_icon(const char *icon_path) {
   int icon_width, icon_height;
   unsigned char *icon_data = stbi_load(icon_path, &icon_width, &icon_height, NULL, STBI_rgb_alpha);
@@ -754,7 +756,7 @@ void x11_make_window_non_resizable(int width, int height) {
 
 
 void zephr_init(const char* font_path, const char* icon_path, const char* window_title, Size window_size) {
-  zephr_ctx = malloc(sizeof(ZephrContext));
+  zephr_ctx = calloc(1, sizeof(ZephrContext));
 
   // TODO: should I initalize the audio here or let the game handle that??
   int res = audio_init();
@@ -790,6 +792,9 @@ bool zephr_should_quit(void) {
   glClearColor(0, 0, 0, 1);
   glClear(GL_COLOR_BUFFER_BIT);
 
+  zephr_ctx->cursor = ZEPHR_CURSOR_ARROW;
+  zephr_ctx->mouse.released = false;
+
   audio_update();
 
   return zephr_ctx->should_quit;
@@ -799,9 +804,8 @@ bool zephr_should_quit(void) {
 void zephr_swap_buffers(void) {
   CORE_DEBUG_ASSERT(zephr_ctx, "Zephr context not initialized");
 
-  zephr_ctx->mouse.released = false;
-
   glXSwapBuffers(x11_display, x11_window);
+  XDefineCursor(x11_display, x11_window, zephr_ctx->cursors[zephr_ctx->cursor]);
 }
 
 Size zephr_get_window_size(void) {
@@ -1042,30 +1046,6 @@ void zephr_set_cursor(ZephrCursor cursor) {
   }
 
   zephr_ctx->cursor = cursor;
-
-  switch (cursor) {
-    case ZEPHR_CURSOR_ARROW:
-      XDefineCursor(x11_display, x11_window, zephr_ctx->cursors[ZEPHR_CURSOR_ARROW]);
-      break;
-    case ZEPHR_CURSOR_IBEAM:
-      XDefineCursor(x11_display, x11_window, zephr_ctx->cursors[ZEPHR_CURSOR_IBEAM]);
-      break;
-    case ZEPHR_CURSOR_CROSSHAIR:
-      XDefineCursor(x11_display, x11_window, zephr_ctx->cursors[ZEPHR_CURSOR_CROSSHAIR]);
-      break;
-    case ZEPHR_CURSOR_HAND:
-      XDefineCursor(x11_display, x11_window, zephr_ctx->cursors[ZEPHR_CURSOR_HAND]);
-      break;
-    case ZEPHR_CURSOR_HRESIZE:
-      XDefineCursor(x11_display, x11_window, zephr_ctx->cursors[ZEPHR_CURSOR_HRESIZE]);
-      break;
-    case ZEPHR_CURSOR_VRESIZE:
-      XDefineCursor(x11_display, x11_window, zephr_ctx->cursors[ZEPHR_CURSOR_VRESIZE]);
-      break;
-    default :
-      XDefineCursor(x11_display, x11_window, zephr_ctx->cursors[ZEPHR_CURSOR_ARROW]);
-      break;
-  }
 }
 
 /* bool zephr_keyboard_scancode_is_pressed(ZephrScancode scancode) { */
