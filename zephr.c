@@ -779,6 +779,7 @@ void zephr_init(const char* font_path, const char* icon_path, const char* window
   zephr_ctx->cursors[ZEPHR_CURSOR_HRESIZE] = XCreateFontCursor(x11_display, XC_sb_h_double_arrow);
   zephr_ctx->cursors[ZEPHR_CURSOR_VRESIZE] = XCreateFontCursor(x11_display, XC_sb_v_double_arrow);
 
+  // non-standard cursors
   zephr_ctx->cursors[ZEPHR_CURSOR_DISABLED] = XcursorLibraryLoadCursor(x11_display, "crossed_circle");
 
   x11_get_screen_size(&zephr_ctx->screen_size.width, &zephr_ctx->screen_size.height);

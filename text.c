@@ -11,6 +11,7 @@
 #include "zephr.h"
 
 #define FONT_PIXEL_SIZE 128
+#define LINE_HEIGHT 2.0f
 
 Shader font_shader;
 unsigned int font_vao;
@@ -288,6 +289,11 @@ Sizef calculate_text_size(const char *text, int font_size) {
     }
 
     h = CORE_MAX(h, max_bearing_h - ch.bearing.height + ch.size.height);
+
+    if (text[i] == '\n') {
+      w = 0;
+      h += max_bearing_h;
+    }
   }
   size.width = (float)w * scale;
   size.height = (float)h * scale;
@@ -337,12 +343,20 @@ GlyphInstanceList get_glyph_instance_list_from_text(const char *text, int font_s
   // model matrix
   int c = 0;
   int x = 0;
+  int y = 0;
   while (text[c] != '\0') {
     Character ch = zephr_ctx->font.characters[(int)text[c]];
     // subtract the bearing width of the first character to remove the extra space
     // at the start of the text and move every char to the left by that width
     float xpos = (x + (ch.bearing.width - first_char_bearing_w));
-    float ypos = (text_size.height - ch.bearing.height - (text_size.height - max_bearing_h));
+    float ypos = y + (text_size.height - ch.bearing.height - (text_size.height - max_bearing_h));
+
+    if (text[c] == '\n') {
+      x = 0;
+      y += max_bearing_h + (u32)(36.f * LINE_HEIGHT);
+      c++;
+      continue;
+    }
 
     GlyphInstance instance = {
       .position = (Vec4f){xpos, ypos, ch.size.width, ch.size.height},

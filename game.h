@@ -13,6 +13,7 @@ typedef enum MoveDir {
 typedef enum IconTexture {
     HELP_ICON,
     SETTINGS_ICON,
+    CLOSE_ICON,
 
     ICON_TEXTURE_COUNT,
 } IconTexture;
@@ -37,6 +38,7 @@ typedef struct Game {
 
     TextureId icon_textures[ICON_TEXTURE_COUNT];
     bool quit_dialog;
+    bool help_dialog;
 } Game;
 
 void draw_board(void);

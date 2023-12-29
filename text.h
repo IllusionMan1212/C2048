@@ -29,6 +29,13 @@ typedef struct GlyphInstanceList {
   int capacity;
 } GlyphInstanceList;
 
+// TODO: impl this to align text relative to its box
+typedef enum TextAlign {
+  TEXT_ALIGN_LEFT,
+  TEXT_ALIGN_CENTER,
+  TEXT_ALIGN_RIGHT
+} TextAlign;
+
 void new_glyph_instance_list(GlyphInstanceList *list, u32 capacity);
 int init_fonts(const char *font_path);
 Sizef calculate_text_size(const char *text, int font_size);

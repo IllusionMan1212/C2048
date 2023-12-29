@@ -43,7 +43,6 @@ void set_parent_constraint(UIConstraints *constraints, UIConstraints *parent_con
 
 void set_x_constraint(UIConstraints *constraints, float value, UIConstraint type) {
   switch (type) {
-    case UI_CONSTRAINT_RELATIVE_PIXELS:
     case UI_CONSTRAINT_ASPECT_RATIO:
       // no-op. fallback to FIXED
     case UI_CONSTRAINT_FIXED:
@@ -51,6 +50,9 @@ void set_x_constraint(UIConstraints *constraints, float value, UIConstraint type
       break;
     case UI_CONSTRAINT_RELATIVE:
       constraints->x = (value * zephr_ctx->window.size.width);
+      break;
+    case UI_CONSTRAINT_RELATIVE_PIXELS:
+      constraints->x = zephr_ctx->window.size.width / (float)zephr_ctx->screen_size.width * value;
       break;
   }
 
@@ -61,7 +63,6 @@ void set_x_constraint(UIConstraints *constraints, float value, UIConstraint type
 
 void set_y_constraint(UIConstraints *constraints, float value, UIConstraint type) {
   switch (type) {
-    case UI_CONSTRAINT_RELATIVE_PIXELS:
     case UI_CONSTRAINT_ASPECT_RATIO:
       // no-op. fallback to FIXED
     case UI_CONSTRAINT_FIXED:
@@ -69,6 +70,9 @@ void set_y_constraint(UIConstraints *constraints, float value, UIConstraint type
       break;
     case UI_CONSTRAINT_RELATIVE:
       constraints->y = (value * zephr_ctx->window.size.height);
+      break;
+    case UI_CONSTRAINT_RELATIVE_PIXELS:
+      constraints->y = zephr_ctx->window.size.height / (float)zephr_ctx->screen_size.height * value;
       break;
   }
 
