@@ -7,11 +7,12 @@
 #include "timer.h"
 #include "zephr.h"
 
-#define ANIM_SPEED 2.5f
+#define TILE_ANIM_SPEED 2.5f
+#define GAMEOVER_ANIM_SPEED 150.f
 
 Game game = {0};
 
-const u8 neighbors[4][2] = {
+const Vec2 neighbors[4] = {
   {-1, 0}, // left
   {1, 0},  // right 
   {0, -1}, // up
@@ -345,8 +346,9 @@ void spawn_random_tile(void) {
   spawn_new_tile(x, y);
 }
 
-// TODO: use this
 bool gameover(void) {
+  if (game.has_lost) return false;
+
   for (int y = 0; y < 4; y++) {
     for (int x = 0; x < 4; x++) {
       if (game.board[y][x].value == 0) {
@@ -354,8 +356,8 @@ bool gameover(void) {
       }
 
       for (int i = 0; i < 4; i++) {
-        u8 new_x = CORE_CLAMP(x + neighbors[i][0], 0, 3);
-        u8 new_y = CORE_CLAMP(y + neighbors[i][1], 0, 3);
+        u8 new_y = CORE_CLAMP(y + neighbors[i].y, 0, 3);
+        u8 new_x = CORE_CLAMP(x + neighbors[i].x, 0, 3);
 
         if ((new_y != y || new_x != x) && game.board[y][x].value == game.board[new_y][new_x].value) {
           return false;
@@ -373,6 +375,9 @@ void game_new(void) {
   game.spawning_new_tile = false;
   game.quit_dialog = false;
   game.help_dialog = false;
+  game.has_lost = false;
+  game.game_over_bg_opacity = 0;
+  game.game_over_opacity = 0;
 
   for (int y = 0; y < 4; y++) {
     for (int x = 0; x < 4; x++) {
@@ -521,6 +526,39 @@ void draw_help_dialog(void) {
   }
 }
 
+void draw_game_over(void) {
+  UIConstraints dialog_con = {0};
+  set_width_constraint(&dialog_con, 1.f, UI_CONSTRAINT_RELATIVE);
+  set_height_constraint(&dialog_con, 1.f, UI_CONSTRAINT_RELATIVE);
+  set_x_constraint(&dialog_con, 0, UI_CONSTRAINT_FIXED);
+  set_y_constraint(&dialog_con, 0, UI_CONSTRAINT_FIXED);
+  draw_quad(&dialog_con, ColorRGBA(0, 0, 0, (u8)game.game_over_bg_opacity), 0, ALIGN_CENTER);
+
+  UIConstraints content_card_con = {0};
+  set_parent_constraint(&content_card_con, &dialog_con);
+  set_width_constraint(&content_card_con, 0.4f, UI_CONSTRAINT_RELATIVE);
+  set_height_constraint(&content_card_con, 0.2f, UI_CONSTRAINT_RELATIVE);
+  draw_quad(&content_card_con, ColorRGBA(135, 124, 124, (u8)game.game_over_opacity), 8, ALIGN_CENTER);
+
+  UIConstraints text_con = {0};
+  set_parent_constraint(&text_con, &content_card_con);
+  set_width_constraint(&text_con, 1, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_x_constraint(&text_con, 0, UI_CONSTRAINT_FIXED);
+  set_y_constraint(&text_con, 40, UI_CONSTRAINT_RELATIVE_PIXELS);
+  draw_text("Game Over!", 64.f, text_con, ColorRGBA(255, 255, 0, (u8)game.game_over_opacity), ALIGN_TOP_CENTER);
+
+  UIConstraints btn_con = {0};
+  const ButtonState btn_state = game.quit_dialog ? BUTTON_STATE_INACTIVE : game.game_over_opacity > 0 ? BUTTON_STATE_ACTIVE : BUTTON_STATE_INACTIVE;
+  set_parent_constraint(&btn_con, &content_card_con);
+  set_x_constraint(&btn_con, 0, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_y_constraint(&btn_con, -24, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_width_constraint(&btn_con, 0.10f, UI_CONSTRAINT_RELATIVE);
+  set_height_constraint(&btn_con, 0.3f, UI_CONSTRAINT_ASPECT_RATIO);
+  if (draw_button(&btn_con, ColorRGBA(201, 146, 126, 255), "Try Again", 8.f, ALIGN_BOTTOM_CENTER, btn_state)) {
+    game_new();
+  }
+}
+
 void draw_ui(void) {
   ButtonState bg_btns_state = game.quit_dialog || game.help_dialog
     ? BUTTON_STATE_INACTIVE
@@ -554,6 +592,10 @@ void draw_ui(void) {
 
   if (game.help_dialog) {
     draw_help_dialog();
+  }
+
+  if (game.has_lost) {
+    draw_game_over();
   }
 
   if (game.quit_dialog) {
@@ -626,7 +668,7 @@ void update_positions(f64 delta_t) {
         for (int i = 0; i < 4; i++) {
           for (int j = 1; j < 4; j++) {
             u8 tiles_to_move = game.board[i][j].tiles_to_move;
-            f32 speed = ANIM_SPEED * tiles_to_move;
+            f32 speed = TILE_ANIM_SPEED * tiles_to_move;
             Tile *src = &game.board[i][j];
             Tile *dest = &game.board[i][j - tiles_to_move];
 
@@ -656,7 +698,7 @@ void update_positions(f64 delta_t) {
         for (int i = 0; i < 4; i++) {
           for (int j = 2; j >= 0; j--) {
             u8 tiles_to_move = game.board[i][j].tiles_to_move;
-            f32 speed = ANIM_SPEED * tiles_to_move;
+            f32 speed = TILE_ANIM_SPEED * tiles_to_move;
             Tile *src = &game.board[i][j];
             Tile *dest = &game.board[i][j + tiles_to_move];
 
@@ -686,7 +728,7 @@ void update_positions(f64 delta_t) {
         for (int i = 1; i < 4; i++) {
           for (int j = 0; j < 4; j++) {
             u8 tiles_to_move = game.board[i][j].tiles_to_move;
-            f32 speed = ANIM_SPEED * tiles_to_move;
+            f32 speed = TILE_ANIM_SPEED * tiles_to_move;
             Tile *src = &game.board[i][j];
             Tile *dest = &game.board[i - tiles_to_move][j];
 
@@ -716,7 +758,7 @@ void update_positions(f64 delta_t) {
         for (int i = 2; i >= 0; i--) {
           for (int j = 0; j < 4; j++) {
             u8 tiles_to_move = game.board[i][j].tiles_to_move;
-            f32 speed = ANIM_SPEED * tiles_to_move;
+            f32 speed = TILE_ANIM_SPEED * tiles_to_move;
             Tile *src = &game.board[i][j];
             Tile *dest = &game.board[i + tiles_to_move][j];
 
@@ -745,9 +787,19 @@ void update_positions(f64 delta_t) {
     }
   }
 
+  if (gameover()) {
+    game.has_lost = true;
+    game.animating = true;
+  }
+
   if (game.spawning_new_tile) {
     spawn_random_tile();
     game.spawning_new_tile = false;
+  }
+
+  if (game.has_lost) {
+    game.game_over_opacity = (float)CORE_MIN(game.game_over_opacity + GAMEOVER_ANIM_SPEED * delta_t, 255);
+    game.game_over_bg_opacity = (float)CORE_MIN(game.game_over_bg_opacity + GAMEOVER_ANIM_SPEED * delta_t, 200);
   }
 }
 

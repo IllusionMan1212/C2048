@@ -34,7 +34,9 @@ typedef struct Game {
     MoveDir last_move_dir;
     bool animating;
     bool spawning_new_tile;
-    bool game_over;
+    bool has_lost;
+    float game_over_bg_opacity;
+    float game_over_opacity;
 
     TextureId icon_textures[ICON_TEXTURE_COUNT];
     bool quit_dialog;
