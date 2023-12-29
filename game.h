@@ -37,6 +37,9 @@ typedef struct Game {
     bool has_lost;
     float game_over_bg_opacity;
     float game_over_opacity;
+    float spawning_tile_scale;
+    Vec2 spawning_tile_coords;
+    u16 spawning_tile_value;
 
     TextureId icon_textures[ICON_TEXTURE_COUNT];
     bool quit_dialog;

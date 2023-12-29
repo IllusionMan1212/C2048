@@ -347,6 +347,7 @@ void draw_texture(UIConstraints *constraints, const TextureId texture_id, const 
 
 bool draw_button(UIConstraints *constraints, const Color color, const char *text, f32 radius, Alignment align, ButtonState state) {
   Color text_color = COLOR_BLACK;
+  text_color.a = color.a;
   Rect rect = {0};
 
   apply_constraints(constraints, &rect.pos, &rect.size);

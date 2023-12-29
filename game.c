@@ -8,7 +8,8 @@
 #include "zephr.h"
 
 #define TILE_ANIM_SPEED 2.5f
-#define GAMEOVER_ANIM_SPEED 150.f
+#define TILE_SPAWN_SPEED 8.0f
+#define GAMEOVER_ANIM_SPEED 175.f
 
 Game game = {0};
 
@@ -60,8 +61,8 @@ void print_new_board() {
   }
 }
 
-Color get_color_from_tile(Tile tile) {
-  switch (tile.value) {
+Color get_tile_color(u16 value) {
+  switch (value) {
     case 2:
       return ColorRGBA(238, 228, 218, 255);
     case 4:
@@ -89,8 +90,8 @@ Color get_color_from_tile(Tile tile) {
   }
 }
 
-u8 get_tile_font_size(Tile tile) {
-  switch (tile.value) {
+u8 get_tile_font_size(u16 value) {
+  switch (value) {
     case 2:
     case 4:
     case 8:
@@ -111,6 +112,7 @@ u8 get_tile_font_size(Tile tile) {
   }
 }
 
+
 ///////////////////////////////////
 //
 //
@@ -118,6 +120,53 @@ u8 get_tile_font_size(Tile tile) {
 //
 //
 ///////////////////////////////////
+
+u16 get_spawned_tile_value(void) {
+  // 90% chance of spawning a 2, 10% chance of spawning a 4
+  if (rand() % 10 < 9) {
+    return 2;
+  } else {
+    return 4;
+  }
+}
+
+void spawn_new_tile_with_value(u8 x, u8 y, u16 value) {
+  game.board[x][y].value = value;
+  game.board[x][y].new_value = value;
+}
+
+void spawn_new_tile(u8 x, u8 y) {
+  const u16 val = get_spawned_tile_value();
+
+  game.board[x][y].value = val;
+  game.board[x][y].new_value = val;
+}
+
+Vec2 get_random_available_tile_coords(void) {
+  u8 available_tiles_count = 0;
+  u8 available_tiles[16];
+
+  for (int i = 0; i < 4; i++) {
+    for (int j = 0; j <= 3; j++) {
+      if (game.board[i][j].new_value == 0 && !game.board[i][j].merged) {
+        available_tiles[available_tiles_count] = i * 4 + j;
+        available_tiles_count++;
+      }
+    }
+  }
+
+  u8 rand_idx = rand() % available_tiles_count;
+
+  u8 x = available_tiles[rand_idx] / 4;
+  u8 y = available_tiles[rand_idx] % 4;
+
+  return (Vec2){x, y};
+}
+
+void spawn_random_tile(void) {
+  Vec2 coords = get_random_available_tile_coords();
+  spawn_new_tile(coords.x, coords.y);
+}
 
 void move_right(void) {
   game.last_move_dir = MOVE_DIR_RIGHT;
@@ -164,6 +213,8 @@ void move_right(void) {
         }
         src->new_value = 0;
         game.animating = true;
+        game.spawning_tile_coords = get_random_available_tile_coords();
+        game.spawning_tile_value = get_spawned_tile_value();
       }
     }
   }
@@ -214,10 +265,11 @@ void move_left(void) {
         }
         src->new_value = 0;
         game.animating = true;
+        game.spawning_tile_coords = get_random_available_tile_coords();
+        game.spawning_tile_value = get_spawned_tile_value();
       }
     }
   }
-
 }
 
 void move_down(void) {
@@ -262,6 +314,8 @@ void move_down(void) {
         }
         src->new_value = 0;
         game.animating = true;
+        game.spawning_tile_coords = get_random_available_tile_coords();
+        game.spawning_tile_value = get_spawned_tile_value();
       }
     }
   }
@@ -309,41 +363,11 @@ void move_up(void) {
         }
         src->new_value = 0;
         game.animating = true;
+        game.spawning_tile_coords = get_random_available_tile_coords();
+        game.spawning_tile_value = get_spawned_tile_value();
       }
     }
   }
-}
-
-void spawn_new_tile(u8 x, u8 y) {
-  // 90% chance of spawning a 2, 10% chance of spawning a 4
-  if (rand() % 10 < 9) {
-    game.board[x][y].value = 2;
-    game.board[x][y].new_value = 2;
-  } else {
-    game.board[x][y].value = 4;
-    game.board[x][y].new_value = 4;
-  }
-}
-
-void spawn_random_tile(void) {
-  u8 available_tiles_count = 0;
-  u8 available_tiles[16];
-
-  for (int i = 0; i < 4; i++) {
-    for (int j = 0; j <= 3; j++) {
-      if (game.board[i][j].new_value == 0 && !game.board[i][j].merged) {
-        available_tiles[available_tiles_count] = i * 4 + j;
-        available_tiles_count++;
-      }
-    }
-  }
-
-  u8 rand_idx = rand() % available_tiles_count;
-
-  u8 x = available_tiles[rand_idx] / 4;
-  u8 y = available_tiles[rand_idx] % 4;
-
-  spawn_new_tile(x, y);
 }
 
 bool gameover(void) {
@@ -369,7 +393,7 @@ bool gameover(void) {
   return true;
 }
 
-void game_new(void) {
+void reset_game(void) {
   game.score = 0;
   game.animating = false;
   game.spawning_new_tile = false;
@@ -536,7 +560,7 @@ void draw_game_over(void) {
 
   UIConstraints content_card_con = {0};
   set_parent_constraint(&content_card_con, &dialog_con);
-  set_width_constraint(&content_card_con, 0.4f, UI_CONSTRAINT_RELATIVE);
+  set_width_constraint(&content_card_con, 0.3f, UI_CONSTRAINT_RELATIVE);
   set_height_constraint(&content_card_con, 0.2f, UI_CONSTRAINT_RELATIVE);
   draw_quad(&content_card_con, ColorRGBA(135, 124, 124, (u8)game.game_over_opacity), 8, ALIGN_CENTER);
 
@@ -554,13 +578,13 @@ void draw_game_over(void) {
   set_y_constraint(&btn_con, -24, UI_CONSTRAINT_RELATIVE_PIXELS);
   set_width_constraint(&btn_con, 0.10f, UI_CONSTRAINT_RELATIVE);
   set_height_constraint(&btn_con, 0.3f, UI_CONSTRAINT_ASPECT_RATIO);
-  if (draw_button(&btn_con, ColorRGBA(201, 146, 126, 255), "Try Again", 8.f, ALIGN_BOTTOM_CENTER, btn_state)) {
-    game_new();
+  if (draw_button(&btn_con, ColorRGBA(201, 146, 126, (u8)game.game_over_opacity), "Try Again", 8.f, ALIGN_BOTTOM_CENTER, btn_state)) {
+    reset_game();
   }
 }
 
 void draw_ui(void) {
-  ButtonState bg_btns_state = game.quit_dialog || game.help_dialog
+  ButtonState bg_btns_state = game.quit_dialog || game.help_dialog || game.has_lost
     ? BUTTON_STATE_INACTIVE
     : BUTTON_STATE_ACTIVE;
   const int icon_btn_width = 80;
@@ -587,7 +611,7 @@ void draw_ui(void) {
   set_width_constraint(&btn_con, 200, UI_CONSTRAINT_RELATIVE_PIXELS);
   set_height_constraint(&btn_con, 65, UI_CONSTRAINT_RELATIVE_PIXELS);
   if (draw_button(&btn_con, ColorRGBA(201, 172, 126, 255), "New Game", btn_con.height * 0.25f, ALIGN_BOTTOM_CENTER, bg_btns_state)) {
-    game_new();
+    reset_game();
   }
 
   if (game.help_dialog) {
@@ -641,12 +665,14 @@ void draw_board(void) {
   for (int i = 0; i < 4; i++) {
     for (int j = 0; j < 4; j++) {
       Tile *tile = &game.board[i][j];
-      Color tile_color = get_color_from_tile(*tile);
+      Color tile_color = get_tile_color(tile->value);
       char value[16];
       sprintf(value, "%d", tile->value);
+      f32 tile_y_pos = (f32)((tile_height + tile_padding) * i + tile_padding + game.board[i][j].anim_y_offset_relative * board_con.height);
+      f32 tile_x_pos = (f32)((tile_height + tile_padding) * j + tile_padding + game.board[i][j].anim_x_offset_relative * board_con.height);
 
-      set_y_constraint(&tile_con, (f32)((tile_height + tile_padding) * i + tile_padding + game.board[i][j].anim_y_offset_relative * board_con.height), UI_CONSTRAINT_FIXED);
-      set_x_constraint(&tile_con, (f32)((tile_height + tile_padding) * j + tile_padding + game.board[i][j].anim_x_offset_relative * board_con.height), UI_CONSTRAINT_FIXED);
+      set_y_constraint(&tile_con, tile_y_pos, UI_CONSTRAINT_FIXED);
+      set_x_constraint(&tile_con, tile_x_pos, UI_CONSTRAINT_FIXED);
       if (tile->value > 0) {
         draw_quad(&tile_con, tile_color, tile_board_radius, ALIGN_TOP_LEFT);
 
@@ -655,9 +681,29 @@ void draw_board(void) {
         set_x_constraint(&text_con, 0, UI_CONSTRAINT_FIXED);
         set_y_constraint(&text_con, 0, UI_CONSTRAINT_FIXED);
 
-        draw_text(value, get_tile_font_size(*tile), text_con, mult_color(tile_color, 0.5), ALIGN_CENTER);
+        draw_text(value, get_tile_font_size(tile->value), text_con, mult_color(tile_color, 0.5), ALIGN_CENTER);
       }
     }
+  }
+
+  if (game.spawning_new_tile) {
+    // spawning tile
+    Color tile_color = get_tile_color(game.spawning_tile_value);
+    f32 tile_x_pos = (f32)((tile_height + tile_padding) * game.spawning_tile_coords.y + tile_padding) + tile_height / 2 - game.spawning_tile_scale * tile_height / 2;
+    f32 tile_y_pos = (f32)((tile_height + tile_padding) * game.spawning_tile_coords.x + tile_padding) + tile_height / 2 - game.spawning_tile_scale * tile_height / 2;
+    set_x_constraint(&tile_con, tile_x_pos, UI_CONSTRAINT_FIXED);
+    set_y_constraint(&tile_con, tile_y_pos, UI_CONSTRAINT_FIXED);
+    set_height_constraint(&tile_con, tile_height * game.spawning_tile_scale, UI_CONSTRAINT_FIXED);
+    set_width_constraint(&tile_con, 1, UI_CONSTRAINT_ASPECT_RATIO);
+    draw_quad(&tile_con, tile_color, tile_board_radius, ALIGN_TOP_LEFT);
+    // value text
+    set_parent_constraint(&text_con, &tile_con);
+    set_x_constraint(&text_con, 0, UI_CONSTRAINT_FIXED);
+    set_y_constraint(&text_con, 0, UI_CONSTRAINT_FIXED);
+
+    char value[16];
+    sprintf(value, "%d", game.spawning_tile_value);
+    draw_text(value, (u8)(get_tile_font_size(game.spawning_tile_value) * game.spawning_tile_scale), text_con, mult_color(tile_color, 0.5), ALIGN_CENTER);
   }
 }
 
@@ -676,8 +722,6 @@ void update_positions(f64 delta_t) {
               src->anim_x_offset_relative -= speed * delta_t;
 
               if (src->anim_x_offset_relative <= -0.240f * (tiles_to_move + (tiles_to_move * 0.02f))) {
-                src->anim_x_offset_relative = -0.240f * (tiles_to_move + (tiles_to_move * 0.02f));
-
                 if (dest->new_value == src->value * 2) {
                   dest->merged = false;
                 }
@@ -687,7 +731,6 @@ void update_positions(f64 delta_t) {
 
                 src->tiles_to_move = 0;
                 src->anim_x_offset_relative = 0;
-                game.animating = false;
                 game.spawning_new_tile = true;
               }
             }
@@ -706,8 +749,6 @@ void update_positions(f64 delta_t) {
               src->anim_x_offset_relative += speed * delta_t;
 
               if (src->anim_x_offset_relative >= 0.240f * (tiles_to_move + (tiles_to_move * 0.02f))) {
-                src->anim_x_offset_relative = 0.240f * (tiles_to_move + (tiles_to_move * 0.02f));
-
                 if (dest->new_value == src->value * 2) {
                   dest->merged = false;
                 }
@@ -717,7 +758,6 @@ void update_positions(f64 delta_t) {
 
                 src->tiles_to_move = 0;
                 src->anim_x_offset_relative = 0;
-                game.animating = false;
                 game.spawning_new_tile = true;
               }
             }
@@ -736,8 +776,6 @@ void update_positions(f64 delta_t) {
               src->anim_y_offset_relative -= speed * delta_t;
 
               if (src->anim_y_offset_relative <= -0.240f * (tiles_to_move + (tiles_to_move * 0.02f))) {
-                src->anim_y_offset_relative = -0.240f * (tiles_to_move + (tiles_to_move * 0.02f));
-
                 if (dest->new_value == src->value * 2) {
                   dest->merged = false;
                 }
@@ -747,7 +785,6 @@ void update_positions(f64 delta_t) {
 
                 src->tiles_to_move = 0;
                 src->anim_y_offset_relative = 0;
-                game.animating = false;
                 game.spawning_new_tile = true;
               }
             }
@@ -766,8 +803,6 @@ void update_positions(f64 delta_t) {
               src->anim_y_offset_relative += speed * delta_t;
 
               if (src->anim_y_offset_relative >= 0.240f * (tiles_to_move + (tiles_to_move * 0.02f))) {
-                src->anim_y_offset_relative = 0.240f * (tiles_to_move + (tiles_to_move * 0.02f));
-
                 if (dest->new_value == src->value * 2) {
                   dest->merged = false;
                 }
@@ -777,7 +812,6 @@ void update_positions(f64 delta_t) {
 
                 src->tiles_to_move = 0;
                 src->anim_y_offset_relative = 0;
-                game.animating = false;
                 game.spawning_new_tile = true;
               }
             }
@@ -793,8 +827,16 @@ void update_positions(f64 delta_t) {
   }
 
   if (game.spawning_new_tile) {
-    spawn_random_tile();
-    game.spawning_new_tile = false;
+    game.spawning_tile_scale += (float)(TILE_SPAWN_SPEED * delta_t);
+
+    if (game.spawning_tile_scale >= 1.0f) {
+      spawn_new_tile_with_value(game.spawning_tile_coords.x, game.spawning_tile_coords.y, game.spawning_tile_value);
+      game.spawning_tile_coords = (Vec2){0, 0};
+      game.spawning_tile_value = 0;
+      game.spawning_new_tile = false;
+      game.animating = false;
+      game.spawning_tile_scale = 0.0f;
+    }
   }
 
   if (game.has_lost) {
