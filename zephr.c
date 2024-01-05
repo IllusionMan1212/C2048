@@ -488,9 +488,22 @@ void x11_resize_window(void) {
   glViewport(0, 0, win_attrs.width, win_attrs.height);
 }
 
-// BUG: fullscreen doesn't work on gnome. may or may not be related to the window being
-// opened as a dialog window
 void x11_go_fullscreen(void) {
+  // remove the resizing constraint before going fullscreen so WMs such as gnome
+  // can add the _NET_WM_ACTION_FULLSCREEN to the _NET_WM_ALLOWED_ACTIONS atom
+  // and properly fullscreen the window
+  XSizeHints *size_hints = XAllocSizeHints();
+
+  zephr_ctx->window.pre_fullscreen_size.width = zephr_ctx->window.size.width;
+  zephr_ctx->window.pre_fullscreen_size.height = zephr_ctx->window.size.height;
+  if (size_hints) {
+    size_hints->flags = PPosition | PSize;
+    size_hints->width = zephr_ctx->window.size.width;
+    size_hints->height = zephr_ctx->window.size.height;
+    XSetWMNormalHints(x11_display, x11_window, size_hints);
+    XFree(size_hints);
+  }
+
   XEvent xev;
   Atom wm_state = XInternAtom(x11_display, "_NET_WM_STATE", False);
   Atom fullscreen = XInternAtom(x11_display, "_NET_WM_STATE_FULLSCREEN", False);
@@ -520,6 +533,25 @@ void x11_return_fullscreen(void) {
   xev.xclient.data.l[2] = 0;
   XSendEvent(x11_display, DefaultRootWindow(x11_display), False,
     SubstructureNotifyMask | SubstructureRedirectMask, &xev);
+
+  // restore the resizing constraint as well as the pre-fullscreen window size
+  // when returning from fullscreen
+  XSizeHints *size_hints = XAllocSizeHints();
+
+  if (size_hints) {
+    size_hints->flags = PPosition | PSize;
+    size_hints->width = zephr_ctx->window.pre_fullscreen_size.width;
+    size_hints->height = zephr_ctx->window.pre_fullscreen_size.height;
+    if (zephr_ctx->window.non_resizable) {
+      size_hints->flags |= PMinSize | PMaxSize;
+      size_hints->min_width = zephr_ctx->window.pre_fullscreen_size.width;
+      size_hints->min_height = zephr_ctx->window.pre_fullscreen_size.height;
+      size_hints->max_width = zephr_ctx->window.pre_fullscreen_size.width;
+      size_hints->max_height = zephr_ctx->window.pre_fullscreen_size.height;
+    }
+    XSetWMNormalHints(x11_display, x11_window, size_hints);
+    XFree(size_hints);
+  }
 }
 
 void x11_toggle_fullscreen(bool fullscreen) {
@@ -557,7 +589,7 @@ void x11_assign_window_icon(const char *icon_path) {
   stbi_image_free(icon_data);
 }
 
-int x11_create_window(const char* title, int window_width, int window_height, const char *icon_path) {
+int x11_create_window(const char* title, int window_width, int window_height, const char *icon_path, bool window_non_resizable) {
   x11_display = XOpenDisplay(NULL);
   CORE_ASSERT(x11_display, "Cannot open x11 display connection\n");
 
@@ -585,12 +617,11 @@ int x11_create_window(const char* title, int window_width, int window_height, co
     x11_assign_window_icon(icon_path);
   }
 
-  // Hints to the WM that the window is a dialog window which makes it a floating
-  // window in tiling WMs (only tested on DWM though)
+  // Hints to the WM that the window is a normal window
   // Of course this is only a hint and the WM can ignore it
   Atom net_wm_window_type = XInternAtom(x11_display, "_NET_WM_WINDOW_TYPE", False);
-  Atom net_wm_window_type_dialog = XInternAtom(x11_display, "_NET_WM_WINDOW_TYPE_DIALOG", False);
-  XChangeProperty(x11_display, x11_window, net_wm_window_type, XA_ATOM, 32, PropModeReplace, (unsigned char*)&net_wm_window_type_dialog, 1);
+  Atom net_wm_window_type_normal = XInternAtom(x11_display, "_NET_WM_WINDOW_TYPE_NORMAL", False);
+  XChangeProperty(x11_display, x11_window, net_wm_window_type, XA_ATOM, 32, PropModeReplace, (unsigned char*)&net_wm_window_type_normal, 1);
 
   Atom wm_delete_window = XInternAtom(x11_display, "WM_DELETE_WINDOW", False);
   XSetWMProtocols(x11_display, x11_window, &wm_delete_window, 1);
@@ -613,12 +644,31 @@ int x11_create_window(const char* title, int window_width, int window_height, co
 
     XClassHint *class_hint = XAllocClassHint();
 
-    if (class_hint)
-    {
+    if (class_hint) {
       class_hint->res_name = class_hint->res_class = (char *)title;
       XSetClassHint(x11_display, x11_window, class_hint);
       XFree(class_hint);
     }
+  }
+
+  XSizeHints *size_hints = XAllocSizeHints();
+
+  if (size_hints) {
+    size_hints->flags = PPosition | PSize;
+    /* size_hints->win_gravity = StaticGravity; */
+    size_hints->x = window_start_x;
+    size_hints->y = window_start_y;
+    size_hints->width = window_width;
+    size_hints->height = window_height;
+    if (window_non_resizable) {
+      size_hints->flags |= PMinSize | PMaxSize;
+      size_hints->min_width = window_width;
+      size_hints->min_height = window_height;
+      size_hints->max_width = window_width;
+      size_hints->max_height = window_height;
+    }
+    XSetWMNormalHints(x11_display, x11_window, size_hints);
+    XFree(size_hints);
   }
 
   XMapWindow(x11_display, x11_window);
@@ -689,8 +739,8 @@ int x11_create_window(const char* title, int window_width, int window_height, co
   return 0;
 }
 
-int x11_init(const char* title, int window_width, int window_height, const char *icon_path) {
-  int res = x11_create_window(title, window_width, window_height, icon_path);
+int x11_init(const char* title, int window_width, int window_height, const char *icon_path, bool window_non_resizable) {
+  int res = x11_create_window(title, window_width, window_height, icon_path, window_non_resizable);
 
 	/* // loads the XMODIFIERS environment variable to see what IME to use */
 	/* XSetLocaleModifiers(""); */
@@ -752,17 +802,6 @@ void x11_get_screen_size(int *width, int *height) {
   *height = screen->height;
 }
 
-void x11_make_window_non_resizable(int width, int height) {
-  XSizeHints *size_hints = XAllocSizeHints();
-  size_hints->flags = PMinSize | PMaxSize;
-  size_hints->min_width = width;
-  size_hints->min_height = height;
-  size_hints->max_width = width;
-  size_hints->max_height = height;
-  XSetWMNormalHints(x11_display, x11_window, size_hints);
-  XFree(size_hints);
-}
-
 ////////////////////////////
 //
 // Zephr
@@ -770,20 +809,21 @@ void x11_make_window_non_resizable(int width, int height) {
 ///////////////////////////
 
 
-void zephr_init(const char* font_path, const char* icon_path, const char* window_title, Size window_size) {
+void zephr_init(const char* font_path, const char* icon_path, const char* window_title, Size window_size, bool window_non_resizable) {
   zephr_ctx = calloc(1, sizeof(ZephrContext));
 
   // TODO: should I initalize the audio here or let the game handle that??
   int res = audio_init();
   CORE_ASSERT(res == 0, "Failed to initialize audio");
 
-  res = x11_init(window_title, window_size.width, window_size.height, icon_path);
+  res = x11_init(window_title, window_size.width, window_size.height, icon_path, window_non_resizable);
   CORE_ASSERT(res == 0, "Failed to initialize X11");
 
   res = init_ui(font_path);
   CORE_ASSERT(res == 0, "Failed to initialize UI");
 
   zephr_ctx->window.size = window_size;
+  zephr_ctx->window.non_resizable = window_non_resizable;
   zephr_ctx->projection = orthographic_projection_2d(0.f, window_size.width, window_size.height, 0.f);
 
   zephr_ctx->cursors[ZEPHR_CURSOR_ARROW] = XCreateFontCursor(x11_display, XC_left_ptr);
@@ -833,13 +873,6 @@ void zephr_swap_buffers(void) {
 
 Size zephr_get_window_size(void) {
   return zephr_ctx->window.size;
-}
-
-// This MUST be called after calling zephr_init()
-void zephr_make_window_non_resizable(void) {
-  CORE_DEBUG_ASSERT(zephr_ctx, "Zephr context not initialized");
-
-  x11_make_window_non_resizable(zephr_ctx->window.size.width, zephr_ctx->window.size.height);
 }
 
 void zephr_toggle_fullscreen(void) {

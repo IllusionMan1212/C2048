@@ -12,8 +12,7 @@ int main(int argc, char *argv[]) {
   CORE_UNUSED(argc);
   CORE_UNUSED(argv);
 
-  zephr_init(font_path, game_icon_path, title, (Size){1200, 800});
-  zephr_make_window_non_resizable();
+  zephr_init(font_path, game_icon_path, title, (Size){1200, 800}, true);
   /* zephr_toggle_fullscreen(); */
 
   game_loop();

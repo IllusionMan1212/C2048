@@ -21,7 +21,9 @@
 
 typedef struct ZephrWindow {
   Size size;
+  Size pre_fullscreen_size;
   bool is_fullscreen;
+  bool non_resizable;
 } ZephrWindow;
 
 typedef enum ZephrEventType {
@@ -391,12 +393,11 @@ typedef struct ZephrContext {
   Matrix4x4 projection;
 } ZephrContext;
 
-void zephr_init(const char* font_path, const char* icon_path, const char* window_title, Size window_size);
+void zephr_init(const char* font_path, const char* icon_path, const char* window_title, Size window_size, bool window_non_resizable);
 void zephr_deinit(void);
 bool zephr_should_quit(void);
 void zephr_swap_buffers(void);
 Size zephr_get_window_size(void);
-void zephr_make_window_non_resizable(void);
 void zephr_toggle_fullscreen(void);
 void zephr_quit(void);
 Color ColorRGBA(u8 r, u8 g, u8 b, u8 a);
