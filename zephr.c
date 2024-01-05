@@ -596,15 +596,30 @@ int x11_create_window(const char* title, int window_width, int window_height, co
   XSetWMProtocols(x11_display, x11_window, &wm_delete_window, 1);
   zephr_ctx->window_delete_atom = wm_delete_window;
 
-  // BUG: window title is broken on gnome's sidebar but works on the window itself.
-  // sidebar shows "Unknown"
-  XStoreName(x11_display, x11_window, title);
-  XTextProperty text_property;
-  text_property.value = (unsigned char *)title;
-  text_property.format = 8;
-  text_property.encoding = XA_STRING;
-  text_property.nitems = strlen(title);
-  XSetWMName(x11_display, x11_window, &text_property);
+  // set window name
+  {
+    Atom UTF8_STRING = XInternAtom(x11_display, "UTF8_STRING", False);
+    XStoreName(x11_display, x11_window, title);
+    XTextProperty text_property;
+    text_property.value = (unsigned char *)title;
+    text_property.format = 8;
+    text_property.encoding = UTF8_STRING;
+    text_property.nitems = strlen(title);
+    XSetWMName(x11_display, x11_window, &text_property);
+    Atom net_wm_name = XInternAtom(x11_display, "_NET_WM_NAME", False);
+    Atom wm_class = XInternAtom(x11_display, "WM_CLASS", False);
+    XChangeProperty(x11_display, x11_window, net_wm_name, UTF8_STRING, 8, PropModeReplace, (unsigned char *)title, strlen(title));
+    XChangeProperty(x11_display, x11_window, wm_class, XA_STRING, 8, PropModeReplace, (unsigned char *)title, strlen(title));
+
+    XClassHint *class_hint = XAllocClassHint();
+
+    if (class_hint)
+    {
+      class_hint->res_name = class_hint->res_class = (char *)title;
+      XSetClassHint(x11_display, x11_window, class_hint);
+      XFree(class_hint);
+    }
+  }
 
   XMapWindow(x11_display, x11_window);
 
