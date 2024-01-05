@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 
 #include <glad/glx.h>
@@ -7,8 +8,13 @@
 #include "zephr.h"
 
 Shader ui_shader;
+Shader color_chooser_shader;
 unsigned int ui_vao;
 unsigned int ui_vbo;
+
+const UIConstraints default_constraints = {
+  .scale = {.height = 1, .width = 1},
+};
 
 int init_ui(const char* font_path) {
   int res = init_fonts(font_path);
@@ -21,6 +27,7 @@ int init_ui(const char* font_path) {
   }
 
   ui_shader = create_shader("shaders/ui.vert", "shaders/ui.frag");
+  color_chooser_shader = create_shader("shaders/ui.vert", "shaders/color_chooser.frag");
 
   glGenVertexArrays(1, &ui_vao);
   glGenBuffers(1, &ui_vbo);
@@ -49,7 +56,11 @@ void set_x_constraint(UIConstraints *constraints, float value, UIConstraint type
       constraints->x = value;
       break;
     case UI_CONSTRAINT_RELATIVE:
-      constraints->x = (value * zephr_ctx->window.size.width);
+      if (constraints->parent) {
+        constraints->x = (value * constraints->parent->width);
+      } else {
+        constraints->x = (value * zephr_ctx->window.size.width);
+      }
       break;
     case UI_CONSTRAINT_RELATIVE_PIXELS:
       constraints->x = zephr_ctx->window.size.width / (float)zephr_ctx->screen_size.width * value;
@@ -69,7 +80,11 @@ void set_y_constraint(UIConstraints *constraints, float value, UIConstraint type
       constraints->y = value;
       break;
     case UI_CONSTRAINT_RELATIVE:
-      constraints->y = (value * zephr_ctx->window.size.height);
+      if (constraints->parent) {
+        constraints->y = (value * constraints->parent->height);
+      } else {
+        constraints->y = (value * zephr_ctx->window.size.height);
+      }
       break;
     case UI_CONSTRAINT_RELATIVE_PIXELS:
       constraints->y = zephr_ctx->window.size.height / (float)zephr_ctx->screen_size.height * value;
@@ -87,7 +102,11 @@ void set_width_constraint(UIConstraints *constraints, float value, UIConstraint 
       constraints->width = value;
       break;
     case UI_CONSTRAINT_RELATIVE:
-      constraints->width = (value * zephr_ctx->window.size.width);
+      if (constraints->parent) {
+        constraints->width = (value * constraints->parent->width);
+      } else {
+        constraints->width = (value * zephr_ctx->window.size.width);
+      }
       break;
     case UI_CONSTRAINT_RELATIVE_PIXELS:
       constraints->width = zephr_ctx->window.size.width / (float)zephr_ctx->screen_size.width * value;
@@ -104,7 +123,11 @@ void set_height_constraint(UIConstraints *constraints, float value, UIConstraint
       constraints->height = value;
       break;
     case UI_CONSTRAINT_RELATIVE:
-      constraints->height = (value * zephr_ctx->window.size.height);
+      if (constraints->parent) {
+        constraints->height = (value * constraints->parent->height);
+      } else {
+        constraints->height = (value * zephr_ctx->window.size.height);
+      }
       break;
     case UI_CONSTRAINT_RELATIVE_PIXELS:
       constraints->height = zephr_ctx->window.size.height / (float)zephr_ctx->screen_size.height * value;
@@ -177,8 +200,15 @@ void apply_alignment(Alignment align, UIConstraints *constraints, Vec2f *pos, Si
 }
 
 bool inside_rect(Rect *rect, Vec2 *point) {
-  if (point->x >= rect->pos.x && point->x <= rect->pos.x + rect->size.width &&
-      point->y >= rect->pos.y && point->y <= rect->pos.y + rect->size.height) {
+  /* bool outside_popup = true; */
+  /* if (rect != &zephr_ctx->ui.popup_rect) { */
+  /*   outside_popup = !inside_rect(&zephr_ctx->ui.popup_rect, point); */
+  /* } else { */
+  /*   outside_popup = false; */
+  /* } */
+
+  if ((point->x >= rect->pos.x && point->x <= rect->pos.x + rect->size.width &&
+      point->y >= rect->pos.y && point->y <= rect->pos.y + rect->size.height)) {
     return true;
   }
   return false;
@@ -204,6 +234,10 @@ void draw_quad(UIConstraints *constraints, const Color color, float border_radiu
   constraints->y = pos.y;
 
   Matrix4x4 model = identity();
+  apply_translation(&model, (Vec2f){-size.width / 2.f, -size.height / 2.f});
+  apply_scale(&model, constraints->scale);
+  apply_translation(&model, (Vec2f){size.width / 2.f, size.height / 2.f});
+
   apply_translation(&model, (Vec2f){-size.width / 2.f, -size.height / 2.f});
   apply_rotation(&model, to_radians(constraints->rotation));
   apply_translation(&model, (Vec2f){size.width / 2.f, size.height / 2.f});
@@ -250,6 +284,7 @@ void draw_triangle(UIConstraints *constraints, const Color color, Alignment alig
   use_shader(ui_shader);
 
   set_vec4f(ui_shader, "aColor", color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f);
+  set_float(ui_shader, "borderRadius", 0.f);
   set_mat4f(ui_shader, "projection", (float *)zephr_ctx->projection.m);
 
   Vec2f pos = { 0.f, 0.f };
@@ -263,6 +298,10 @@ void draw_triangle(UIConstraints *constraints, const Color color, Alignment alig
   constraints->y = pos.y;
 
   Matrix4x4 model = identity();
+  apply_translation(&model, (Vec2f){-size.width / 2.f, -size.height / 2.f});
+  apply_scale(&model, constraints->scale);
+  apply_translation(&model, (Vec2f){size.width / 2.f, size.height / 2.f});
+
   apply_translation(&model, (Vec2f){-size.width / 2.f, -size.height / 2.f});
   apply_rotation(&model, to_radians(constraints->rotation));
   apply_translation(&model, (Vec2f){size.width / 2.f, size.height / 2.f});
@@ -310,6 +349,10 @@ void draw_texture(UIConstraints *constraints, const TextureId texture_id, const 
   constraints->y = pos.y;
 
   Matrix4x4 model = identity();
+  apply_translation(&model, (Vec2f){-size.width / 2.f, -size.height / 2.f});
+  apply_scale(&model, constraints->scale);
+  apply_translation(&model, (Vec2f){size.width / 2.f, size.height / 2.f});
+
   apply_translation(&model, (Vec2f){-size.width / 2.f, -size.height / 2.f});
   apply_rotation(&model, to_radians(constraints->rotation));
   apply_translation(&model, (Vec2f){size.width / 2.f, size.height / 2.f});
@@ -380,7 +423,7 @@ bool draw_button(UIConstraints *constraints, const Color color, const char *text
   }
 
   if (text) {
-    UIConstraints text_constraints = {0};
+    UIConstraints text_constraints = default_constraints;
 
     set_parent_constraint(&text_constraints, constraints);
     set_x_constraint(&text_constraints, 0, UI_CONSTRAINT_RELATIVE_PIXELS);
@@ -434,7 +477,7 @@ bool draw_icon_button(UIConstraints *constraints, Color btn_color, const Texture
 
   draw_quad(constraints, btn_color, radius, align);
 
-  UIConstraints icon_constraints = {0};
+  UIConstraints icon_constraints = default_constraints;
 
   set_parent_constraint(&icon_constraints, constraints);
   set_x_constraint(&icon_constraints, 0, UI_CONSTRAINT_RELATIVE_PIXELS);
@@ -448,6 +491,243 @@ bool draw_icon_button(UIConstraints *constraints, Color btn_color, const Texture
   }
 
   return false;
+}
+
+void draw_color_picker_slider(UIConstraints *constraints, Alignment align) {
+  use_shader(color_chooser_shader);
+
+  set_bool(color_chooser_shader, "isSlider", true);
+  set_mat4f(color_chooser_shader, "projection", (float *)zephr_ctx->projection.m);
+
+  Vec2f pos = { 0.f, 0.f };
+  Sizef size = { 0.f, 0.f };
+
+  apply_constraints(constraints, &pos, &size);
+  apply_alignment(align, constraints, &pos, size);
+
+  // set the positions after applying alignment so children can use them
+  constraints->x = pos.x;
+  constraints->y = pos.y;
+
+  Matrix4x4 model = identity();
+  apply_translation(&model, pos);
+
+  set_mat4f(color_chooser_shader, "model", (float *)model.m);
+
+  glBindVertexArray(ui_vao);
+
+  float vertices[6][4] = {
+    // bottom left tri
+    {0,              0 + size.height, 0.0, 1.0},
+    {0,              0,               0.0, 0.0},
+    {0 + size.width, 0,               1.0, 0.0},
+
+    // top right tri
+    {0,              0 + size.height, 0.0, 1.0},
+    {0 + size.width, 0,               1.0, 0.0},
+    {0 + size.width, 0 + size.height, 1.0, 1.0},
+  };
+
+  glBindBuffer(GL_ARRAY_BUFFER, ui_vbo);
+  glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+  glDrawArrays(GL_TRIANGLES, 0, 6);
+
+  glBindVertexArray(0);
+  set_bool(color_chooser_shader, "isSlider", false);
+}
+
+void draw_color_picker_canvas(UIConstraints *constraints, f32 slider_percentage, Alignment align) {
+  use_shader(color_chooser_shader);
+
+  set_bool(color_chooser_shader, "isSlider", false);
+  set_float(color_chooser_shader, "sliderPercentage", slider_percentage);
+  set_mat4f(color_chooser_shader, "projection", (float *)zephr_ctx->projection.m);
+
+  Vec2f pos = { 0.f, 0.f };
+  Sizef size = { 0.f, 0.f };
+
+  apply_constraints(constraints, &pos, &size);
+  apply_alignment(align, constraints, &pos, size);
+
+  // set the positions after applying alignment so children can use them
+  constraints->x = pos.x;
+  constraints->y = pos.y;
+
+  Matrix4x4 model = identity();
+  apply_translation(&model, pos);
+
+  set_mat4f(color_chooser_shader, "model", (float *)model.m);
+
+  glBindVertexArray(ui_vao);
+
+  float vertices[6][4] = {
+    // bottom left tri
+    {0,              0 + size.height, 0.0, 1.0},
+    {0,              0,               0.0, 0.0},
+    {0 + size.width, 0,               1.0, 0.0},
+
+    // top right tri
+    {0,              0 + size.height, 0.0, 1.0},
+    {0 + size.width, 0,               1.0, 0.0},
+    {0 + size.width, 0 + size.height, 1.0, 1.0},
+  };
+
+  glBindBuffer(GL_ARRAY_BUFFER, ui_vbo);
+  glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+  glDrawArrays(GL_TRIANGLES, 0, 6);
+
+  glBindVertexArray(0);
+}
+
+// TODO: consume mouse events on the popup
+void draw_color_picker_popup(UIConstraints *picker_button_con) {
+  UIConstraints popup_con = default_constraints;
+  set_parent_constraint(&popup_con, picker_button_con);
+  set_x_constraint(&popup_con, 0, UI_CONSTRAINT_FIXED);
+  set_y_constraint(&popup_con, picker_button_con->height + 20, UI_CONSTRAINT_FIXED);
+  set_width_constraint(&popup_con, 450, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_height_constraint(&popup_con, 480, UI_CONSTRAINT_RELATIVE_PIXELS);
+  draw_quad(&popup_con, mult_color(COLOR_WHITE, 0.94f), 8, ALIGN_TOP_LEFT);
+
+  UIConstraints color_slider_con = default_constraints;
+  set_parent_constraint(&color_slider_con, &popup_con);
+  set_x_constraint(&color_slider_con, -0.04f, UI_CONSTRAINT_RELATIVE);
+  set_y_constraint(&color_slider_con, 0.05f, UI_CONSTRAINT_RELATIVE);
+  set_height_constraint(&color_slider_con, 400 * 0.9f, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_width_constraint(&color_slider_con, 0.1f, UI_CONSTRAINT_ASPECT_RATIO);
+  draw_color_picker_slider(&color_slider_con, ALIGN_TOP_RIGHT);
+
+  static f32 slider_selection = 0;
+  static Vec2f canvas_pos = {0};
+
+  if (inside_rect(&(Rect){{color_slider_con.x, color_slider_con.y}, {color_slider_con.width, color_slider_con.height}}, &zephr_ctx->mouse.pos) &&
+      zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
+    slider_selection = (zephr_ctx->mouse.pos.y - color_slider_con.y) / color_slider_con.height;
+  }
+
+  UIConstraints triangle_con = default_constraints;
+  set_parent_constraint(&triangle_con, &color_slider_con);
+  set_x_constraint(&triangle_con, -11, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_y_constraint(&triangle_con, slider_selection, UI_CONSTRAINT_RELATIVE);
+  set_rotation_constraint(&triangle_con, -90);
+  set_width_constraint(&triangle_con, 14, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_height_constraint(&triangle_con, 0.5f, UI_CONSTRAINT_ASPECT_RATIO);
+  triangle_con.y += -(triangle_con.height / 2.f);
+  draw_triangle(&triangle_con, COLOR_BLACK, ALIGN_TOP_LEFT);
+
+  set_x_constraint(&triangle_con, 1, UI_CONSTRAINT_RELATIVE);
+  triangle_con.x -= triangle_con.height / 2;
+  set_rotation_constraint(&triangle_con, 90);
+  draw_triangle(&triangle_con, COLOR_BLACK, ALIGN_TOP_LEFT);
+
+  set_x_constraint(&color_slider_con, 0.04f, UI_CONSTRAINT_RELATIVE);
+  set_y_constraint(&color_slider_con, 0.05f, UI_CONSTRAINT_RELATIVE);
+  set_width_constraint(&color_slider_con, popup_con.width * 0.8f, UI_CONSTRAINT_FIXED);
+  draw_color_picker_canvas(&color_slider_con, slider_selection, ALIGN_TOP_LEFT);
+
+  if (inside_rect(&(Rect){{color_slider_con.x, color_slider_con.y}, {color_slider_con.width, color_slider_con.height}}, &zephr_ctx->mouse.pos) &&
+      zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
+    f32 x = (zephr_ctx->mouse.pos.x - color_slider_con.x) / color_slider_con.width;
+    f32 y = (zephr_ctx->mouse.pos.y - color_slider_con.y) / color_slider_con.height;
+
+    canvas_pos.x = x;
+    canvas_pos.y = y;
+  }
+
+  set_parent_constraint(&triangle_con, &color_slider_con);
+  set_x_constraint(&triangle_con, canvas_pos.x, UI_CONSTRAINT_RELATIVE);
+  set_y_constraint(&triangle_con, canvas_pos.y, UI_CONSTRAINT_RELATIVE);
+  triangle_con.x -= triangle_con.height;
+  triangle_con.y -= triangle_con.height * 2;
+  set_rotation_constraint(&triangle_con, 0);
+  draw_triangle(&triangle_con, COLOR_WHITE, ALIGN_TOP_LEFT);
+
+  triangle_con.x += triangle_con.height * 2;
+  triangle_con.y += triangle_con.height * 2;
+  set_rotation_constraint(&triangle_con, 90);
+  draw_triangle(&triangle_con, COLOR_WHITE, ALIGN_TOP_LEFT);
+
+  triangle_con.x -= triangle_con.height * 2;
+  triangle_con.y += triangle_con.height * 2;
+  set_rotation_constraint(&triangle_con, 180);
+  draw_triangle(&triangle_con, COLOR_WHITE, ALIGN_TOP_LEFT);
+
+  triangle_con.x -= triangle_con.height * 2;
+  triangle_con.y -= triangle_con.height * 2;
+  set_rotation_constraint(&triangle_con, 270);
+  draw_triangle(&triangle_con, COLOR_WHITE, ALIGN_TOP_LEFT);
+
+  UIConstraints button_con = default_constraints;
+  set_parent_constraint(&button_con, &popup_con);
+  set_x_constraint(&button_con, 0.04f, UI_CONSTRAINT_RELATIVE);
+  set_y_constraint(&button_con, -0.05f, UI_CONSTRAINT_RELATIVE);
+  set_width_constraint(&button_con, 0.43f, UI_CONSTRAINT_RELATIVE);
+  set_height_constraint(&button_con, 0.3f, UI_CONSTRAINT_ASPECT_RATIO);
+  if (draw_button(&button_con, *zephr_ctx->ui.popup_revert_color, "Revert", 4, ALIGN_BOTTOM_LEFT, BUTTON_STATE_ACTIVE)) {
+    zephr_ctx->ui.popup_open = false;
+  }
+
+  Color selected_color = hsv2rgb(slider_selection * 360.f, canvas_pos.x, 1.0f - canvas_pos.y);
+
+  set_x_constraint(&button_con, -0.04f, UI_CONSTRAINT_RELATIVE);
+  set_y_constraint(&button_con, -0.05f, UI_CONSTRAINT_RELATIVE);
+  if (draw_button(&button_con, selected_color, "Apply", 4, ALIGN_BOTTOM_RIGHT, BUTTON_STATE_ACTIVE)) {
+    *zephr_ctx->ui.popup_revert_color = selected_color;
+    zephr_ctx->ui.popup_open = false;
+  }
+
+  zephr_ctx->ui.popup_rect = (Rect){{popup_con.x, popup_con.y}, {popup_con.width, popup_con.height}};
+}
+
+void draw_color_picker(UIConstraints *constraints, Color *color, Alignment align, ButtonState state) {
+  Rect rect = {0};
+  Color display_color = *color;
+
+  UIConstraints con = *constraints;
+
+  apply_constraints(&con, &rect.pos, &rect.size);
+  apply_alignment(align, &con, &rect.pos, rect.size);
+
+  bool is_hovered = inside_rect(&rect, &zephr_ctx->mouse.pos);
+  bool left_mouse_pressed = zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT;
+
+  if (is_hovered && state == BUTTON_STATE_ACTIVE) {
+    zephr_set_cursor(ZEPHR_CURSOR_HAND);
+    con.scale.height *= 1.08f;
+    con.scale.width *= 1.08f;
+
+    if (left_mouse_pressed) {
+      display_color = mult_color(display_color, 0.8f);
+    } else {
+      display_color = mult_color(display_color, 0.9f);
+    }
+  } else if (state == BUTTON_STATE_DISABLED) {
+    if (is_hovered) {
+      zephr_set_cursor(ZEPHR_CURSOR_DISABLED);
+    }
+
+    display_color.a = 100;
+  }
+
+  draw_quad(&con, display_color, con.width * 0.08f, align);
+
+  if (is_hovered && state == BUTTON_STATE_ACTIVE && zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
+    zephr_ctx->ui.popup_open = true;
+    zephr_ctx->ui.popup_parent_constraints = con;
+    zephr_ctx->ui.popup_revert_color = color;
+    /* zephr_ctx->ui.popup_rect = (Rect){rect.pos, rect.size}; */
+    /* draw_color_picker_overlay(constraints); */
+  }
+
+  /* if (is_hovered && state == BUTTON_STATE_ACTIVE && zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) { */
+  /*   return true; */
+  /* } */
+
+  /* return false; */
 }
 
 

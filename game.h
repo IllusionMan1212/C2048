@@ -18,6 +18,12 @@ typedef enum IconTexture {
     ICON_TEXTURE_COUNT,
 } IconTexture;
 
+typedef struct ColorPalette {
+    Color bg_color;
+    Color board_bg_color;
+    Color tile_colors[11];
+} ColorPalette;
+
 typedef struct Tile {
     u16 value;
     u16 new_value;
@@ -41,9 +47,12 @@ typedef struct Game {
     Vec2 spawning_tile_coords;
     u16 spawning_tile_value;
 
-    TextureId icon_textures[ICON_TEXTURE_COUNT];
     bool quit_dialog;
     bool help_dialog;
+    bool settings_dialog;
+
+    TextureId icon_textures[ICON_TEXTURE_COUNT];
+    ColorPalette palette;
 } Game;
 
 void draw_board(void);

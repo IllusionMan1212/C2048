@@ -3,11 +3,6 @@
 #include "texture.h"
 #include "zephr_math.h"
 
-typedef struct Rect {
-  Vec2f pos;
-  Sizef size;
-} Rect;
-
 typedef enum Alignment {
   ALIGN_TOP_LEFT,
   ALIGN_TOP_CENTER,
@@ -33,8 +28,23 @@ typedef struct UIConstraints {
   float width;
   float height;
   float rotation;
+  Sizef scale;
   struct UIConstraints *parent;
 } UIConstraints;
+
+extern const UIConstraints default_constraints;
+
+typedef struct Rect {
+  Vec2f pos;
+  Sizef size;
+} Rect;
+
+typedef struct UI {
+  bool popup_open;
+  Rect popup_rect;
+  UIConstraints popup_parent_constraints;
+  Color *popup_revert_color;
+} UI;
 
 typedef enum ButtonState {
   BUTTON_STATE_ACTIVE,
@@ -51,8 +61,11 @@ void set_height_constraint(UIConstraints *constraints, float value, UIConstraint
 void set_rotation_constraint(UIConstraints *constraints, float angle_d);
 void apply_constraints(UIConstraints *constraints, Vec2f *pos, Sizef *size);
 void apply_alignment(Alignment align, UIConstraints *constraints, Vec2f *pos, Sizef size);
+bool inside_rect(Rect *rect, Vec2 *point);
 void draw_quad(UIConstraints *constraints, const Color color, float border_radius, Alignment align);
 void draw_circle(UIConstraints *constraints, const Color color, Alignment align);
 void draw_triangle(UIConstraints *constraints, const Color color, Alignment align);
 bool draw_button(UIConstraints *constraints, Color color, const char *text, f32 radius, Alignment align, ButtonState state);
 bool draw_icon_button(UIConstraints *constraints, Color color, const TextureId icon_tex_id, f32 radius, Alignment align, ButtonState state);
+void draw_color_picker_popup(UIConstraints *picker_button_con);
+void draw_color_picker(UIConstraints *constraints, Color *color, Alignment align, ButtonState state);

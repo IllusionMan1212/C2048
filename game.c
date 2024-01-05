@@ -64,29 +64,29 @@ void print_new_board() {
 Color get_tile_color(u16 value) {
   switch (value) {
     case 2:
-      return ColorRGBA(238, 228, 218, 255);
+      return game.palette.tile_colors[0];
     case 4:
-      return ColorRGBA(237, 224, 200, 255);
+      return game.palette.tile_colors[1];
     case 8:
-      return ColorRGBA(242, 177, 121, 255);
+      return game.palette.tile_colors[2];
     case 16:
-      return ColorRGBA(245, 149, 99, 255);
+      return game.palette.tile_colors[3];
     case 32:
-      return ColorRGBA(246, 124, 95, 255);
+      return game.palette.tile_colors[4];
     case 64:
-      return ColorRGBA(246, 94, 59, 255);
+      return game.palette.tile_colors[5];
     case 128:
-      return ColorRGBA(237, 207, 114, 255);
+      return game.palette.tile_colors[6];
     case 256:
-      return ColorRGBA(237, 204, 97, 255);
+      return game.palette.tile_colors[7];
     case 512:
-      return ColorRGBA(237, 200, 80, 255);
+      return game.palette.tile_colors[8];
     case 1024:
-      return ColorRGBA(237, 197, 63, 255);
+      return game.palette.tile_colors[9];
     case 2048:
-      return ColorRGBA(237, 194, 46, 255);
+      return game.palette.tile_colors[10];
     default:
-      return ColorRGBA(237, 194, 46, 255);
+      return game.palette.tile_colors[10];
   }
 }
 
@@ -399,6 +399,7 @@ void reset_game(void) {
   game.spawning_new_tile = false;
   game.quit_dialog = false;
   game.help_dialog = false;
+  game.settings_dialog = false;
   game.has_lost = false;
   game.game_over_bg_opacity = 0;
   game.game_over_opacity = 0;
@@ -421,7 +422,27 @@ void reset_game(void) {
 
 void game_attempt_quit(void) {
   game.help_dialog = false;
+  game.settings_dialog = false;
   game.quit_dialog = true;
+}
+
+void reset_palette(void) {
+  game.palette = (ColorPalette){
+    .bg_color = ColorRGBA(248, 250, 230, 255),
+      .board_bg_color = ColorRGBA(140, 154, 147, 255),
+
+      .tile_colors[0] = ColorRGBA(238, 228, 218, 255), // 2
+      .tile_colors[1] = ColorRGBA(237, 224, 200, 255), // 4
+      .tile_colors[2] = ColorRGBA(242, 177, 121, 255), // 8
+      .tile_colors[3] = ColorRGBA(245, 149, 99, 255),  // 16
+      .tile_colors[4] = ColorRGBA(246, 124, 95, 255),  // 32
+      .tile_colors[5] = ColorRGBA(246, 94, 59, 255),   // 64
+      .tile_colors[6] = ColorRGBA(237, 207, 114, 255), // 128
+      .tile_colors[7] = ColorRGBA(237, 204, 97, 255),  // 256
+      .tile_colors[8] = ColorRGBA(237, 200, 80, 255),  // 512
+      .tile_colors[9] = ColorRGBA(237, 197, 63, 255),  // 1024
+      .tile_colors[10] = ColorRGBA(237, 194, 46, 255), // 2048
+  };
 }
 
 void game_init(void) {
@@ -430,6 +451,8 @@ void game_init(void) {
   game.icon_textures[HELP_ICON] = load_texture("assets/icons/help.png");
   game.icon_textures[SETTINGS_ICON] = load_texture("assets/icons/settings.png");
   game.icon_textures[CLOSE_ICON] = load_texture("assets/icons/close.png");
+
+  reset_palette();
 
   for (int i = 0; i < 2; i++) {
     spawn_random_tile();
@@ -447,37 +470,39 @@ void game_init(void) {
 
 void draw_bg(void) {
   Size window_size = zephr_get_window_size();
-  UIConstraints board_con = {0};
+  UIConstraints board_con = default_constraints;
 
   set_width_constraint(&board_con, window_size.width, UI_CONSTRAINT_FIXED);
   set_height_constraint(&board_con, window_size.height, UI_CONSTRAINT_FIXED);
 
   // bg
-  draw_quad(&board_con, ColorRGBA(248, 250, 230, 255), 0, ALIGN_TOP_LEFT);
+  draw_quad(&board_con, game.palette.bg_color, 0, ALIGN_TOP_LEFT);
+
+  GlyphInstanceList batch;
+  new_glyph_instance_list(&batch, 32);
 
   // 2048 text
-  UIConstraints text_con = {0};
+  UIConstraints text_con = default_constraints;
 
   set_y_constraint(&text_con, 0.05f, UI_CONSTRAINT_RELATIVE);
   set_width_constraint(&text_con, 1.5, UI_CONSTRAINT_RELATIVE_PIXELS);
 
-  draw_text("2048", 100, text_con, ColorRGBA(34, 234, 82, 155), ALIGN_TOP_CENTER);
+  add_text_instance(&batch, "2048", 100, text_con, ColorRGBA(34, 234, 82, 155), ALIGN_TOP_CENTER);
 
   // score
-  char score[16];
-  sprintf(score, "%d", game.score);
+  char score[24];
+  sprintf(score, "Score   %d", game.score);
 
   set_parent_constraint(&text_con, NULL);
   set_x_constraint(&text_con, 0.05f, UI_CONSTRAINT_RELATIVE);
   set_y_constraint(&text_con, 0.8f, UI_CONSTRAINT_RELATIVE);
-  draw_text("Score", 40, text_con, COLOR_BLACK, ALIGN_TOP_LEFT);
+  add_text_instance(&batch, score, 40, text_con, COLOR_BLACK, ALIGN_TOP_LEFT);
 
-  set_x_constraint(&text_con, 0.15f, UI_CONSTRAINT_RELATIVE);
-  draw_text(score, 40, text_con, COLOR_BLACK, ALIGN_TOP_LEFT);
+  draw_text_batch(&batch);
 }
 
 void draw_quit_dialog(void) {
-  UIConstraints dialog_con = {0};
+  UIConstraints dialog_con = default_constraints;
   set_x_constraint(&dialog_con, 0, UI_CONSTRAINT_FIXED);
   set_y_constraint(&dialog_con, 0, UI_CONSTRAINT_FIXED);
   set_width_constraint(&dialog_con, 1.f, UI_CONSTRAINT_RELATIVE);
@@ -488,45 +513,45 @@ void draw_quit_dialog(void) {
   set_height_constraint(&dialog_con, 0.2f, UI_CONSTRAINT_RELATIVE);
   draw_quad(&dialog_con, ColorRGBA(135, 124, 124, 255), 8, ALIGN_CENTER);
 
-  UIConstraints text_con = {0};
+  UIConstraints text_con = default_constraints;
   set_parent_constraint(&text_con, &dialog_con);
   set_x_constraint(&text_con, 0, UI_CONSTRAINT_FIXED);
-  set_y_constraint(&text_con, -0.04f, UI_CONSTRAINT_RELATIVE);
+  set_y_constraint(&text_con, -0.25f, UI_CONSTRAINT_RELATIVE);
   set_width_constraint(&text_con, 1, UI_CONSTRAINT_RELATIVE_PIXELS);
   draw_text("Are you sure you want to quit?", 36.f, text_con, COLOR_WHITE, ALIGN_CENTER);
 
-  UIConstraints btn_con = {0};
+  UIConstraints btn_con = default_constraints;
   set_parent_constraint(&btn_con, &dialog_con);
-  set_width_constraint(&btn_con, 0.12f, UI_CONSTRAINT_RELATIVE);
-  set_height_constraint(&btn_con, 0.05f, UI_CONSTRAINT_RELATIVE);
-  set_y_constraint(&btn_con, -0.02f, UI_CONSTRAINT_RELATIVE);
-  set_x_constraint(&btn_con, -0.07f, UI_CONSTRAINT_RELATIVE);
+  set_width_constraint(&btn_con, 0.25f, UI_CONSTRAINT_RELATIVE);
+  set_height_constraint(&btn_con, 0.25f, UI_CONSTRAINT_RELATIVE);
+  set_y_constraint(&btn_con, -0.10f, UI_CONSTRAINT_RELATIVE);
+  set_x_constraint(&btn_con, -0.20f, UI_CONSTRAINT_RELATIVE);
   if (draw_button(&btn_con, mult_color(COLOR_WHITE, 0.9f), "Yes", btn_con.height * 0.20f, ALIGN_BOTTOM_CENTER, BUTTON_STATE_ACTIVE)) {
     zephr_quit();
   }
 
-  set_y_constraint(&btn_con, -0.02f, UI_CONSTRAINT_RELATIVE);
-  set_x_constraint(&btn_con, 0.07f, UI_CONSTRAINT_RELATIVE);
+  set_y_constraint(&btn_con, -0.10f, UI_CONSTRAINT_RELATIVE);
+  set_x_constraint(&btn_con, 0.20f, UI_CONSTRAINT_RELATIVE);
   if (draw_button(&btn_con, mult_color(COLOR_WHITE, 0.9f), "No", btn_con.height * 0.20f, ALIGN_BOTTOM_CENTER, BUTTON_STATE_ACTIVE)) {
     game.quit_dialog = false;
   }
 }
 
 void draw_help_dialog(void) {
-  UIConstraints dialog_con = {0};
+  UIConstraints dialog_con = default_constraints;
   set_width_constraint(&dialog_con, 1.f, UI_CONSTRAINT_RELATIVE);
   set_height_constraint(&dialog_con, 1.f, UI_CONSTRAINT_RELATIVE);
   set_x_constraint(&dialog_con, 0, UI_CONSTRAINT_FIXED);
   set_y_constraint(&dialog_con, 0, UI_CONSTRAINT_FIXED);
   draw_quad(&dialog_con, ColorRGBA(0, 0, 0, 200), 0, ALIGN_CENTER);
 
-  UIConstraints content_card_con = {0};
+  UIConstraints content_card_con = default_constraints;
   set_parent_constraint(&content_card_con, &dialog_con);
   set_width_constraint(&content_card_con, 0.4f, UI_CONSTRAINT_RELATIVE);
-  set_height_constraint(&content_card_con, 0.3f, UI_CONSTRAINT_RELATIVE);
+  set_height_constraint(&content_card_con, 0.33f, UI_CONSTRAINT_RELATIVE);
   draw_quad(&content_card_con, ColorRGBA(135, 124, 124, 255), 8, ALIGN_CENTER);
 
-  UIConstraints text_con = {0};
+  UIConstraints text_con = default_constraints;
   set_parent_constraint(&text_con, &content_card_con);
   set_width_constraint(&text_con, 1, UI_CONSTRAINT_RELATIVE_PIXELS);
   set_x_constraint(&text_con, 0, UI_CONSTRAINT_FIXED);
@@ -539,7 +564,7 @@ void draw_help_dialog(void) {
             "When two tiles with the same number touch, they\n"
             "merge into one!\n\nYour goal is to reach 2048 without filling all the tiles", 30.f, text_con, COLOR_WHITE, ALIGN_CENTER);
 
-  UIConstraints btn_con = {0};
+  UIConstraints btn_con = default_constraints;
   set_parent_constraint(&btn_con, &content_card_con);
   set_width_constraint(&btn_con, 56, UI_CONSTRAINT_RELATIVE_PIXELS);
   set_height_constraint(&btn_con, 1, UI_CONSTRAINT_ASPECT_RATIO);
@@ -550,33 +575,124 @@ void draw_help_dialog(void) {
   }
 }
 
+void draw_settings_dialog(void) {
+  UIConstraints dialog_con = default_constraints;
+  set_width_constraint(&dialog_con, 1.f, UI_CONSTRAINT_RELATIVE);
+  set_height_constraint(&dialog_con, 1.f, UI_CONSTRAINT_RELATIVE);
+  set_x_constraint(&dialog_con, 0, UI_CONSTRAINT_FIXED);
+  set_y_constraint(&dialog_con, 0, UI_CONSTRAINT_FIXED);
+  draw_quad(&dialog_con, ColorRGBA(0, 0, 0, 200), 0, ALIGN_CENTER);
+
+  UIConstraints content_card_con = default_constraints;
+  set_parent_constraint(&content_card_con, &dialog_con);
+  set_width_constraint(&content_card_con, 0.55f, UI_CONSTRAINT_RELATIVE);
+  set_height_constraint(&content_card_con, 0.6f, UI_CONSTRAINT_RELATIVE);
+  draw_quad(&content_card_con, ColorRGBA(135, 124, 124, 255), 8, ALIGN_CENTER);
+
+  UIConstraints text_con = default_constraints;
+  set_parent_constraint(&text_con, &content_card_con);
+  set_width_constraint(&text_con, 1, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_x_constraint(&text_con, 0, UI_CONSTRAINT_FIXED);
+  set_y_constraint(&text_con, 40, UI_CONSTRAINT_RELATIVE_PIXELS);
+  draw_text("Settings", 64.f, text_con, COLOR_YELLOW, ALIGN_TOP_CENTER);
+
+  set_x_constraint(&text_con, 30, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_y_constraint(&text_con, 150, UI_CONSTRAINT_RELATIVE_PIXELS);
+  draw_text("Color Palette", 40.f, text_con, COLOR_WHITE, ALIGN_TOP_LEFT);
+
+  const char *bg_color_text = "Background: ";
+  const u8 font_size = 30.f;
+  set_x_constraint(&text_con, 30, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_y_constraint(&text_con, 220, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_height_constraint(&text_con, 0.9f, UI_CONSTRAINT_RELATIVE);
+  draw_text(bg_color_text, font_size, text_con, COLOR_WHITE, ALIGN_TOP_LEFT);
+
+  Sizef text_size = calculate_text_size(bg_color_text, font_size);
+  UIConstraints color_picker_con = default_constraints;
+  set_parent_constraint(&color_picker_con, &content_card_con);
+  set_x_constraint(&color_picker_con, 30 + text_size.width + 20, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_y_constraint(&color_picker_con, 220 - text_size.height / 2.f + 6, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_width_constraint(&color_picker_con, 100, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_height_constraint(&color_picker_con, 40, UI_CONSTRAINT_RELATIVE_PIXELS);
+  draw_color_picker(&color_picker_con, &game.palette.bg_color, ALIGN_TOP_LEFT, BUTTON_STATE_ACTIVE);
+
+  set_y_constraint(&text_con, 270, UI_CONSTRAINT_RELATIVE_PIXELS);
+  draw_text("Board: ", font_size, text_con, COLOR_WHITE, ALIGN_TOP_LEFT);
+
+  set_x_constraint(&color_picker_con, 30 + text_size.width + 20, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_y_constraint(&color_picker_con, 270 - text_size.height / 2.f + 6, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_width_constraint(&color_picker_con, 100, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_height_constraint(&color_picker_con, 40, UI_CONSTRAINT_RELATIVE_PIXELS);
+  draw_color_picker(&color_picker_con, &game.palette.board_bg_color, ALIGN_TOP_LEFT, BUTTON_STATE_ACTIVE);
+
+  set_y_constraint(&text_con, 320, UI_CONSTRAINT_RELATIVE_PIXELS);
+  draw_text("Tiles: ", font_size, text_con, COLOR_WHITE, ALIGN_TOP_LEFT);
+
+  const u8 tile_size = 60;
+  for (u8 i = 0; i < 11; i++) {
+    set_x_constraint(&color_picker_con, 30 + text_size.width + 20 + (i * (tile_size + 10)), UI_CONSTRAINT_RELATIVE_PIXELS);
+    set_y_constraint(&color_picker_con, 320 - text_size.height / 2.f + 6, UI_CONSTRAINT_RELATIVE_PIXELS);
+    set_width_constraint(&color_picker_con, tile_size, UI_CONSTRAINT_RELATIVE_PIXELS);
+    set_height_constraint(&color_picker_con, tile_size, UI_CONSTRAINT_RELATIVE_PIXELS);
+    draw_color_picker(&color_picker_con, &game.palette.tile_colors[i], ALIGN_TOP_LEFT, BUTTON_STATE_ACTIVE);
+
+    u16 tile_val = (u16)pow(2, i + 1);
+    char text[16];
+    sprintf(text, "%d", tile_val);
+    const f32 font_size = get_tile_font_size(tile_val) * 0.5f;
+    const Color tile_color = get_tile_color(tile_val);
+    set_parent_constraint(&text_con, &color_picker_con);
+    set_x_constraint(&text_con, 0, UI_CONSTRAINT_RELATIVE_PIXELS);
+    set_y_constraint(&text_con, 0, UI_CONSTRAINT_RELATIVE_PIXELS);
+    draw_text(text, (u8)font_size, text_con, mult_color(tile_color, 0.5f), ALIGN_CENTER);
+  }
+
+  UIConstraints btn_con = default_constraints;
+  set_parent_constraint(&btn_con, &content_card_con);
+  set_x_constraint(&btn_con, 0, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_y_constraint(&btn_con, 400, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_width_constraint(&btn_con, 150, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_height_constraint(&btn_con, 0.35f, UI_CONSTRAINT_ASPECT_RATIO);
+  if (draw_button(&btn_con, ColorRGBA(201, 146, 126, 255), "Reset", 8.f, ALIGN_TOP_CENTER, BUTTON_STATE_ACTIVE)) {
+    reset_palette();
+  }
+
+  set_width_constraint(&btn_con, 56, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_height_constraint(&btn_con, 1, UI_CONSTRAINT_ASPECT_RATIO);
+  set_y_constraint(&btn_con, -24, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_x_constraint(&btn_con, 24, UI_CONSTRAINT_RELATIVE_PIXELS);
+  if (draw_icon_button(&btn_con, mult_color(COLOR_WHITE, 0.8f), game.icon_textures[CLOSE_ICON], btn_con.height * 0.20f, ALIGN_TOP_RIGHT, BUTTON_STATE_ACTIVE)) {
+    game.settings_dialog = false;
+  }
+}
+
 void draw_game_over(void) {
-  UIConstraints dialog_con = {0};
+  UIConstraints dialog_con = default_constraints;
   set_width_constraint(&dialog_con, 1.f, UI_CONSTRAINT_RELATIVE);
   set_height_constraint(&dialog_con, 1.f, UI_CONSTRAINT_RELATIVE);
   set_x_constraint(&dialog_con, 0, UI_CONSTRAINT_FIXED);
   set_y_constraint(&dialog_con, 0, UI_CONSTRAINT_FIXED);
   draw_quad(&dialog_con, ColorRGBA(0, 0, 0, (u8)game.game_over_bg_opacity), 0, ALIGN_CENTER);
 
-  UIConstraints content_card_con = {0};
+  UIConstraints content_card_con = default_constraints;
   set_parent_constraint(&content_card_con, &dialog_con);
   set_width_constraint(&content_card_con, 0.3f, UI_CONSTRAINT_RELATIVE);
   set_height_constraint(&content_card_con, 0.2f, UI_CONSTRAINT_RELATIVE);
   draw_quad(&content_card_con, ColorRGBA(135, 124, 124, (u8)game.game_over_opacity), 8, ALIGN_CENTER);
 
-  UIConstraints text_con = {0};
+  UIConstraints text_con = default_constraints;
   set_parent_constraint(&text_con, &content_card_con);
   set_width_constraint(&text_con, 1, UI_CONSTRAINT_RELATIVE_PIXELS);
   set_x_constraint(&text_con, 0, UI_CONSTRAINT_FIXED);
   set_y_constraint(&text_con, 40, UI_CONSTRAINT_RELATIVE_PIXELS);
   draw_text("Game Over!", 64.f, text_con, ColorRGBA(255, 255, 0, (u8)game.game_over_opacity), ALIGN_TOP_CENTER);
 
-  UIConstraints btn_con = {0};
+  UIConstraints btn_con = default_constraints;
   const ButtonState btn_state = game.quit_dialog ? BUTTON_STATE_INACTIVE : game.game_over_opacity > 0 ? BUTTON_STATE_ACTIVE : BUTTON_STATE_INACTIVE;
   set_parent_constraint(&btn_con, &content_card_con);
   set_x_constraint(&btn_con, 0, UI_CONSTRAINT_RELATIVE_PIXELS);
   set_y_constraint(&btn_con, -24, UI_CONSTRAINT_RELATIVE_PIXELS);
-  set_width_constraint(&btn_con, 0.10f, UI_CONSTRAINT_RELATIVE);
+  set_width_constraint(&btn_con, 0.30f, UI_CONSTRAINT_RELATIVE);
   set_height_constraint(&btn_con, 0.3f, UI_CONSTRAINT_ASPECT_RATIO);
   if (draw_button(&btn_con, ColorRGBA(201, 146, 126, (u8)game.game_over_opacity), "Try Again", 8.f, ALIGN_BOTTOM_CENTER, btn_state)) {
     reset_game();
@@ -584,14 +700,14 @@ void draw_game_over(void) {
 }
 
 void draw_ui(void) {
-  ButtonState bg_btns_state = game.quit_dialog || game.help_dialog || game.has_lost
+  ButtonState bg_btns_state = game.quit_dialog || game.help_dialog || game.settings_dialog || game.has_lost
     ? BUTTON_STATE_INACTIVE
     : BUTTON_STATE_ACTIVE;
   const int icon_btn_width = 80;
   const int icon_btn_offset = 8;
   const int icon_btns_padding = 10;
 
-  UIConstraints btn_con = {0};
+  UIConstraints btn_con = default_constraints;
   set_x_constraint(&btn_con, -icon_btn_offset, UI_CONSTRAINT_RELATIVE_PIXELS);
   set_y_constraint(&btn_con, icon_btn_offset, UI_CONSTRAINT_RELATIVE_PIXELS);
   set_width_constraint(&btn_con, icon_btn_width, UI_CONSTRAINT_RELATIVE_PIXELS);
@@ -603,7 +719,7 @@ void draw_ui(void) {
 
   set_x_constraint(&btn_con, -icon_btn_offset - icon_btn_width - icon_btns_padding, UI_CONSTRAINT_RELATIVE_PIXELS);
   if (draw_icon_button(&btn_con, ColorRGBA(201, 146, 126, 255), game.icon_textures[SETTINGS_ICON], btn_con.height * 0.15f, ALIGN_TOP_RIGHT, bg_btns_state)) {
-    printf("TODO: settings\n");
+    game.settings_dialog = true;
   }
 
   set_x_constraint(&btn_con, 0, UI_CONSTRAINT_RELATIVE_PIXELS);
@@ -612,6 +728,10 @@ void draw_ui(void) {
   set_height_constraint(&btn_con, 65, UI_CONSTRAINT_RELATIVE_PIXELS);
   if (draw_button(&btn_con, ColorRGBA(201, 172, 126, 255), "New Game", btn_con.height * 0.25f, ALIGN_BOTTOM_CENTER, bg_btns_state)) {
     reset_game();
+  }
+
+  if (game.settings_dialog) {
+    draw_settings_dialog();
   }
 
   if (game.help_dialog) {
@@ -629,19 +749,19 @@ void draw_ui(void) {
 
 void draw_board(void) {
   // board
-  UIConstraints board_con = {0};
+  UIConstraints board_con = default_constraints;
   set_y_constraint(&board_con, 0.05f, UI_CONSTRAINT_RELATIVE);
   set_height_constraint(&board_con, 0.6f, UI_CONSTRAINT_RELATIVE);
   set_width_constraint(&board_con, 1, UI_CONSTRAINT_ASPECT_RATIO);
   const float board_border_radius = board_con.width * 0.02f;
-  draw_quad(&board_con, ColorRGBA(140, 154, 147, 255), board_border_radius, ALIGN_CENTER);
+  draw_quad(&board_con, game.palette.board_bg_color, board_border_radius, ALIGN_CENTER);
 
   // empty tiles
   const float tile_padding = board_con.width * 0.02f;
   const float tile_height = board_con.height * 0.225f;
   const float tile_board_radius = tile_height * 0.15f;
 
-  UIConstraints empty_tile_con = {0};
+  UIConstraints empty_tile_con = default_constraints;
   set_parent_constraint(&empty_tile_con, &board_con);
   set_height_constraint(&empty_tile_con, tile_height, UI_CONSTRAINT_FIXED);
   set_width_constraint(&empty_tile_con, 1, UI_CONSTRAINT_ASPECT_RATIO);
@@ -650,14 +770,14 @@ void draw_board(void) {
     set_y_constraint(&empty_tile_con, (tile_height + tile_padding) * i + tile_padding, UI_CONSTRAINT_FIXED);
     for (int j = 0; j < 4; j++) {
       set_x_constraint(&empty_tile_con, (tile_height + tile_padding) * j + tile_padding, UI_CONSTRAINT_FIXED);
-      draw_quad(&empty_tile_con, ColorRGBA(120, 133, 126, 255), tile_board_radius, ALIGN_TOP_LEFT);
+      draw_quad(&empty_tile_con, mult_color(game.palette.board_bg_color, 0.85f), tile_board_radius, ALIGN_TOP_LEFT);
     }
   }
 
   // filled tiles
-  UIConstraints text_con = {0};
+  UIConstraints text_con = default_constraints;
   set_width_constraint(&text_con, 1.5, UI_CONSTRAINT_RELATIVE_PIXELS);
-  UIConstraints tile_con = {0};
+  UIConstraints tile_con = default_constraints;
   set_parent_constraint(&tile_con, &board_con);
   set_height_constraint(&tile_con, tile_height, UI_CONSTRAINT_FIXED);
   set_width_constraint(&tile_con, 1, UI_CONSTRAINT_ASPECT_RATIO);
@@ -863,6 +983,7 @@ void handle_keyboard_input(ZephrEvent e) {
   } else if (e.key.code == ZEPHR_KEYCODE_ESCAPE) {
     game.quit_dialog = false;
     game.help_dialog = false;
+    game.settings_dialog = false;
   } else if (e.key.code == ZEPHR_KEYCODE_F11) {
     zephr_toggle_fullscreen();
   } else if (e.key.code == ZEPHR_KEYCODE_UP) {

@@ -380,6 +380,8 @@ typedef struct ZephrContext {
   ZephrMouse mouse;
   ZephrCursor cursor;
   ZephrCursor cursors[ZEPHR_CURSOR_COUNT];
+  UI ui;
+
   /* ZephrKeyboard keyboard; */
   /* XkbDescPtr xkb; */
   /* XIM xim; */

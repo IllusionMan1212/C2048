@@ -10,7 +10,7 @@
 #include "text.h"
 #include "zephr.h"
 
-#define FONT_PIXEL_SIZE 128
+#define FONT_PIXEL_SIZE 100
 #define LINE_HEIGHT 2.0f
 
 Shader font_shader;
@@ -100,7 +100,7 @@ int init_freetype(const char* font_path) {
     tex_height = CORE_MAX(tex_height, face->glyph->bitmap.rows);
   }
 
-  char *pixels = (char *)calloc(tex_width * tex_height, 1);
+  char *pixels = (char *)malloc(tex_width * tex_height);
 
   for (u32 i = 32; i < 128; i++) {
   /* while (glyph_idx) { */

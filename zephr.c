@@ -539,7 +539,7 @@ void x11_assign_window_icon(const char *icon_path) {
 
   u32 target_size = 2 + icon_width * icon_height;
 
-  u64 *data = malloc(target_size * sizeof(u64));
+  u64 *data = alloca(target_size * sizeof(u64));
   u64 *target = data;
 
   // first two elements are width and height
@@ -554,7 +554,6 @@ void x11_assign_window_icon(const char *icon_path) {
 
   XChangeProperty(x11_display, x11_window, net_wm_icon, XA_CARDINAL, 32, PropModeReplace, (unsigned char*)data, target_size);
 
-  free(data);
   stbi_image_free(icon_data);
 }
 
@@ -809,6 +808,10 @@ bool zephr_should_quit(void) {
 void zephr_swap_buffers(void) {
   CORE_DEBUG_ASSERT(zephr_ctx, "Zephr context not initialized");
 
+  if (zephr_ctx->ui.popup_open) {
+    draw_color_picker_popup(&zephr_ctx->ui.popup_parent_constraints);
+  }
+
   glXSwapBuffers(x11_display, x11_window);
   XDefineCursor(x11_display, x11_window, zephr_ctx->cursors[zephr_ctx->cursor]);
 }
@@ -1016,12 +1019,21 @@ bool zephr_iter_events(ZephrEvent *event_out) {
       switch (xev.xbutton.button) {
         case Button1:
           event_out->mouse.button = ZEPHR_MOUSE_BUTTON_LEFT;
+          if (!inside_rect(&zephr_ctx->ui.popup_rect, &event_out->mouse.position)) {
+            zephr_ctx->ui.popup_open = false;
+          }
           break;
         case Button2:
           event_out->mouse.button = ZEPHR_MOUSE_BUTTON_MIDDLE;
+          if (!inside_rect(&zephr_ctx->ui.popup_rect, &event_out->mouse.position)) {
+            zephr_ctx->ui.popup_open = false;
+          }
           break;
         case Button3:
           event_out->mouse.button = ZEPHR_MOUSE_BUTTON_RIGHT;
+          if (!inside_rect(&zephr_ctx->ui.popup_rect, &event_out->mouse.position)) {
+            zephr_ctx->ui.popup_open = false;
+          }
           break;
       }
 
