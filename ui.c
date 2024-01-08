@@ -493,7 +493,10 @@ bool draw_icon_button(UIConstraints *constraints, Color btn_color, const Texture
   return false;
 }
 
-void draw_color_picker_slider(UIConstraints *constraints, Alignment align) {
+f32 draw_color_picker_slider(UIConstraints *constraints, Alignment align) {
+  static f32 slider_selection = 0;
+  static bool slider_dragging = false;
+
   use_shader(color_chooser_shader);
 
   set_bool(color_chooser_shader, "isSlider", true);
@@ -508,6 +511,19 @@ void draw_color_picker_slider(UIConstraints *constraints, Alignment align) {
   // set the positions after applying alignment so children can use them
   constraints->x = pos.x;
   constraints->y = pos.y;
+
+  if (inside_rect(&(Rect){{constraints->x, constraints->y}, {constraints->width, constraints->height}}, &zephr_ctx->mouse.pos) &&
+      zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
+    slider_dragging = true;
+  }
+
+  if (zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
+    slider_dragging = false;
+  }
+
+  if (slider_dragging) {
+    slider_selection = CORE_CLAMP((zephr_ctx->mouse.pos.y - constraints->y) / constraints->height, 0, 1);
+  }
 
   Matrix4x4 model = identity();
   apply_translation(&model, pos);
@@ -536,9 +552,14 @@ void draw_color_picker_slider(UIConstraints *constraints, Alignment align) {
 
   glBindVertexArray(0);
   set_bool(color_chooser_shader, "isSlider", false);
+
+  return slider_selection;
 }
 
-void draw_color_picker_canvas(UIConstraints *constraints, f32 slider_percentage, Alignment align) {
+Vec2f draw_color_picker_canvas(UIConstraints *constraints, f32 slider_percentage, Alignment align) {
+  static bool canvas_dragging = false;
+  static Vec2f canvas_pos = {0};
+
   use_shader(color_chooser_shader);
 
   set_bool(color_chooser_shader, "isSlider", false);
@@ -555,6 +576,23 @@ void draw_color_picker_canvas(UIConstraints *constraints, f32 slider_percentage,
   constraints->x = pos.x;
   constraints->y = pos.y;
 
+  if (inside_rect(&(Rect){{constraints->x, constraints->y}, {constraints->width, constraints->height}}, &zephr_ctx->mouse.pos) &&
+      zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
+    canvas_dragging = true;
+  }
+
+  if (zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
+    canvas_dragging = false;
+  }
+
+  if (canvas_dragging) {
+    f32 x = (zephr_ctx->mouse.pos.x - constraints->x) / constraints->width;
+    f32 y = (zephr_ctx->mouse.pos.y - constraints->y) / constraints->height;
+
+    canvas_pos.x = CORE_CLAMP(x, 0, 1);
+    canvas_pos.y = CORE_CLAMP(y, 0, 1);
+  }
+
   Matrix4x4 model = identity();
   apply_translation(&model, pos);
 
@@ -581,6 +619,8 @@ void draw_color_picker_canvas(UIConstraints *constraints, f32 slider_percentage,
   glDrawArrays(GL_TRIANGLES, 0, 6);
 
   glBindVertexArray(0);
+
+  return canvas_pos;
 }
 
 // TODO: consume mouse events on the popup
@@ -599,15 +639,8 @@ void draw_color_picker_popup(UIConstraints *picker_button_con) {
   set_y_constraint(&color_slider_con, 0.05f, UI_CONSTRAINT_RELATIVE);
   set_height_constraint(&color_slider_con, 400 * 0.9f, UI_CONSTRAINT_RELATIVE_PIXELS);
   set_width_constraint(&color_slider_con, 0.1f, UI_CONSTRAINT_ASPECT_RATIO);
-  draw_color_picker_slider(&color_slider_con, ALIGN_TOP_RIGHT);
+  f32 slider_selection = draw_color_picker_slider(&color_slider_con, ALIGN_TOP_RIGHT);
 
-  static f32 slider_selection = 0;
-  static Vec2f canvas_pos = {0};
-
-  if (inside_rect(&(Rect){{color_slider_con.x, color_slider_con.y}, {color_slider_con.width, color_slider_con.height}}, &zephr_ctx->mouse.pos) &&
-      zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
-    slider_selection = (zephr_ctx->mouse.pos.y - color_slider_con.y) / color_slider_con.height;
-  }
 
   UIConstraints triangle_con = default_constraints;
   set_parent_constraint(&triangle_con, &color_slider_con);
@@ -627,16 +660,7 @@ void draw_color_picker_popup(UIConstraints *picker_button_con) {
   set_x_constraint(&color_slider_con, 0.04f, UI_CONSTRAINT_RELATIVE);
   set_y_constraint(&color_slider_con, 0.05f, UI_CONSTRAINT_RELATIVE);
   set_width_constraint(&color_slider_con, popup_con.width * 0.8f, UI_CONSTRAINT_FIXED);
-  draw_color_picker_canvas(&color_slider_con, slider_selection, ALIGN_TOP_LEFT);
-
-  if (inside_rect(&(Rect){{color_slider_con.x, color_slider_con.y}, {color_slider_con.width, color_slider_con.height}}, &zephr_ctx->mouse.pos) &&
-      zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
-    f32 x = (zephr_ctx->mouse.pos.x - color_slider_con.x) / color_slider_con.width;
-    f32 y = (zephr_ctx->mouse.pos.y - color_slider_con.y) / color_slider_con.height;
-
-    canvas_pos.x = x;
-    canvas_pos.y = y;
-  }
+  Vec2f canvas_pos = draw_color_picker_canvas(&color_slider_con, slider_selection, ALIGN_TOP_LEFT);
 
   set_parent_constraint(&triangle_con, &color_slider_con);
   set_x_constraint(&triangle_con, canvas_pos.x, UI_CONSTRAINT_RELATIVE);
