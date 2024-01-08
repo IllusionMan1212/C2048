@@ -55,6 +55,13 @@ typedef enum ButtonState {
   BUTTON_STATE_DISABLED,
 } ButtonState;
 
+typedef struct UiStyle {
+  Color bg_color;
+  Color fg_color;
+  f32 border_radius;
+  Alignment align;
+} UiStyle;
+
 int init_ui(const char* font_path);
 void set_parent_constraint(UIConstraints *constraints, UIConstraints *parent_constraints);
 void set_x_constraint(UIConstraints *constraints, float value, UIConstraint type);
@@ -62,16 +69,16 @@ void set_y_constraint(UIConstraints *constraints, float value, UIConstraint type
 void set_width_constraint(UIConstraints *constraints, float value, UIConstraint type);
 void set_height_constraint(UIConstraints *constraints, float value, UIConstraint type);
 void set_rotation_constraint(UIConstraints *constraints, float angle_d);
-void apply_constraints(UIConstraints *constraints, Vec2f *pos, Sizef *size);
-void apply_alignment(Alignment align, UIConstraints *constraints, Vec2f *pos, Sizef size);
-bool inside_rect(Rect *rect, Vec2 *point);
-void draw_quad(UIConstraints *constraints, const Color color, float border_radius, Alignment align);
-void draw_circle(UIConstraints *constraints, const Color color, Alignment align);
-void draw_triangle(UIConstraints *constraints, const Color color, Alignment align);
-bool draw_button_with_location(const char* file, int line, UIConstraints *constraints, Color color, const char *text, f32 radius, Alignment align, ButtonState state);
-bool draw_icon_button_with_location(const char* fie, int line, UIConstraints *constraints, Color color, const TextureId icon_tex_id, f32 radius, Alignment align, ButtonState state);
+void apply_constraints(UIConstraints *constraints, Vec2f *pos, Sizef *size);                // internal
+void apply_alignment(Alignment align, UIConstraints *constraints, Vec2f *pos, Sizef size);  // internal
+bool inside_rect(Rect *rect, Vec2 *point);                                                  // internal
+void draw_quad(UIConstraints *constraints, const UiStyle style);
+void draw_circle(UIConstraints *constraints, const UiStyle style);
+void draw_triangle(UIConstraints *constraints, const UiStyle style);
+bool draw_button_with_location(const char* file, int line, UIConstraints *constraints, const char *text, UiStyle style, ButtonState state);
+bool draw_icon_button_with_location(const char* file, int line, UIConstraints *constraints, const TextureId icon_tex_id, UiStyle style, ButtonState state);
 void draw_color_picker_popup(UIConstraints *picker_button_con);
 void draw_color_picker(UIConstraints *constraints, Color *color, Alignment align, ButtonState state);
 
-#define draw_button(constraints, color, text, radius, align, state) draw_button_with_location(__FILE__, __LINE__, constraints, color, text, radius, align, state)
-#define draw_icon_button(constraints, color, icon_tex_id, radius, align, state) draw_icon_button_with_location(__FILE__, __LINE__, constraints, color, icon_tex_id, radius, align, state)
+#define draw_button(constraints, text, style, state) draw_button_with_location(__FILE__, __LINE__, constraints, text, style, state)
+#define draw_icon_button(constraints, icon_tex_id, style, state) draw_icon_button_with_location(__FILE__, __LINE__, constraints, icon_tex_id, style, state)

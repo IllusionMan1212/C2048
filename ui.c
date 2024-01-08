@@ -216,35 +216,34 @@ bool inside_rect(Rect *rect, Vec2 *point) {
   return false;
 }
 
-void draw_quad(UIConstraints *constraints, const Color color, float border_radius, Alignment align) {
+void draw_quad(UIConstraints *constraints, const UiStyle style) {
   use_shader(ui_shader);
 
-  set_vec4f(ui_shader, "aColor", color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f);
+  set_vec4f(ui_shader, "aColor", style.bg_color.r / 255.f, style.bg_color.g / 255.f, style.bg_color.b / 255.f, style.bg_color.a / 255.f);
   set_float(ui_shader, "uiWidth", constraints->width);
   set_float(ui_shader, "uiHeight", constraints->height);
-  set_float(ui_shader, "borderRadius", border_radius);
+  set_float(ui_shader, "borderRadius", style.border_radius);
   set_mat4f(ui_shader, "projection", (float *)zephr_ctx->projection.m);
 
-  Vec2f pos = { 0.f, 0.f };
-  Sizef size = { 0.f, 0.f };
+  Rect rect = {0};
 
-  apply_constraints(constraints, &pos, &size);
-  apply_alignment(align, constraints, &pos, size);
+  apply_constraints(constraints, &rect.pos, &rect.size);
+  apply_alignment(style.align, constraints, &rect.pos, rect.size);
 
   // set the positions after applying alignment so children can use them
-  constraints->x = pos.x;
-  constraints->y = pos.y;
+  constraints->x = rect.pos.x;
+  constraints->y = rect.pos.y;
 
   Matrix4x4 model = identity();
-  apply_translation(&model, (Vec2f){-size.width / 2.f, -size.height / 2.f});
+  apply_translation(&model, (Vec2f){-rect.size.width / 2.f, -rect.size.height / 2.f});
   apply_scale(&model, constraints->scale);
-  apply_translation(&model, (Vec2f){size.width / 2.f, size.height / 2.f});
+  apply_translation(&model, (Vec2f){rect.size.width / 2.f, rect.size.height / 2.f});
 
-  apply_translation(&model, (Vec2f){-size.width / 2.f, -size.height / 2.f});
+  apply_translation(&model, (Vec2f){-rect.size.width / 2.f, -rect.size.height / 2.f});
   apply_rotation(&model, to_radians(constraints->rotation));
-  apply_translation(&model, (Vec2f){size.width / 2.f, size.height / 2.f});
+  apply_translation(&model, (Vec2f){rect.size.width / 2.f, rect.size.height / 2.f});
 
-  apply_translation(&model, pos);
+  apply_translation(&model, rect.pos);
 
   set_mat4f(ui_shader, "model", (float *)model.m);
 
@@ -252,14 +251,14 @@ void draw_quad(UIConstraints *constraints, const Color color, float border_radiu
 
   float vertices[6][4] = {
     // bottom left tri
-    {0,              0 + size.height, 0.0, 1.0},
-    {0,              0,               0.0, 0.0},
-    {0 + size.width, 0,               1.0, 0.0},
+    {0,                   0 + rect.size.height, 0.0, 1.0},
+    {0,                   0,                    0.0, 0.0},
+    {0 + rect.size.width, 0,                    1.0, 0.0},
 
     // top right tri
-    {0,              0 + size.height, 0.0, 1.0},
-    {0 + size.width, 0,               1.0, 0.0},
-    {0 + size.width, 0 + size.height, 1.0, 1.0},
+    {0,                   0 + rect.size.height, 0.0, 1.0},
+    {0 + rect.size.width, 0,                    1.0, 0.0},
+    {0 + rect.size.width, 0 + rect.size.height, 1.0, 1.0},
   };
 
   glBindBuffer(GL_ARRAY_BUFFER, ui_vbo);
@@ -271,7 +270,7 @@ void draw_quad(UIConstraints *constraints, const Color color, float border_radiu
   glBindVertexArray(0);
 }
 
-void draw_circle(UIConstraints *constraints, const Color color, Alignment align) {
+void draw_circle(UIConstraints *constraints, const UiStyle style) {
   float radius = 0.f;
 
   if (constraints->width > constraints->height) {
@@ -279,13 +278,17 @@ void draw_circle(UIConstraints *constraints, const Color color, Alignment align)
   } else {
     radius = constraints->width / 2.f;
   }
-  draw_quad(constraints, color, radius, align);
+
+  UiStyle new_style = style;
+  new_style.border_radius = radius;
+
+  draw_quad(constraints, new_style);
 }
 
-void draw_triangle(UIConstraints *constraints, const Color color, Alignment align) {
+void draw_triangle(UIConstraints *constraints, const UiStyle style) {
   use_shader(ui_shader);
 
-  set_vec4f(ui_shader, "aColor", color.r / 255.f, color.g / 255.f, color.b / 255.f, color.a / 255.f);
+  set_vec4f(ui_shader, "aColor", style.bg_color.r / 255.f, style.bg_color.g / 255.f, style.bg_color.b / 255.f, style.bg_color.a / 255.f);
   set_float(ui_shader, "borderRadius", 0.f);
   set_mat4f(ui_shader, "projection", (float *)zephr_ctx->projection.m);
 
@@ -293,7 +296,7 @@ void draw_triangle(UIConstraints *constraints, const Color color, Alignment alig
   Sizef size = { 0.f, 0.f };
 
   apply_constraints(constraints, &pos, &size);
-  apply_alignment(align, constraints, &pos, size);
+  apply_alignment(style.align, constraints, &pos, size);
 
   // set the positions after applying alignment so children can use them
   constraints->x = pos.x;
@@ -390,16 +393,15 @@ void draw_texture(UIConstraints *constraints, const TextureId texture_id, const 
   set_bool(ui_shader, "hasTexture", false);
 }
 
-bool draw_button_with_location(const char *file, int line, UIConstraints *constraints, const Color color, const char *text, f32 radius, Alignment align, ButtonState state) {
+bool draw_button_with_location(const char *file, int line, UIConstraints *constraints, const char *text, UiStyle style, ButtonState state) {
   UiIdHash hash = core_fnv_hash32(file, strlen(file), CORE_FNV_HASH32_INIT);
   hash = core_fnv_hash32(&line, sizeof(line), hash);
 
-  Color text_color = COLOR_BLACK;
-  text_color.a = color.a;
+  style.fg_color.a = style.bg_color.a;
   Rect rect = {0};
 
   apply_constraints(constraints, &rect.pos, &rect.size);
-  apply_alignment(align, constraints, &rect.pos, rect.size);
+  apply_alignment(style.align, constraints, &rect.pos, rect.size);
 
   bool is_hovered = inside_rect(&rect, &zephr_ctx->mouse.pos);
   bool left_mouse_pressed = zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT;
@@ -424,23 +426,22 @@ bool draw_button_with_location(const char *file, int line, UIConstraints *constr
     zephr_set_cursor(ZEPHR_CURSOR_HAND);
 
     if (left_mouse_pressed) {
-      Color new_color = mult_color(color, 0.8f);
-      draw_quad(constraints, new_color, radius, align);
+      style.bg_color = mult_color(style.bg_color, 0.8f);
+      draw_quad(constraints, style);
     } else {
-      Color new_color = mult_color(color, 0.9f);
-      draw_quad(constraints, new_color, radius, align);
+      style.bg_color = mult_color(style.bg_color, 0.9f);
+      draw_quad(constraints, style);
     }
   } else if (state == BUTTON_STATE_DISABLED) {
     if (is_hovered) {
       zephr_set_cursor(ZEPHR_CURSOR_DISABLED);
     }
 
-    Color new_color = color;
-    new_color.a = 100;
-    text_color.a = 100;
-    draw_quad(constraints, new_color, radius, align);
+    style.bg_color.a = 100;
+    style.fg_color.a = 100;
+    draw_quad(constraints, style);
   } else {
-    draw_quad(constraints, color, radius, align);
+    draw_quad(constraints, style);
   }
 
   if (text) {
@@ -455,7 +456,7 @@ bool draw_button_with_location(const char *file, int line, UIConstraints *constr
 
     // TODO: need to adjust the font size based on the text height
 
-    draw_text(text, font_size, text_constraints, text_color, ALIGN_CENTER);
+    draw_text(text, font_size, text_constraints, style.fg_color, ALIGN_CENTER);
   }
 
   if (clicked && state == BUTTON_STATE_ACTIVE) {
@@ -465,17 +466,16 @@ bool draw_button_with_location(const char *file, int line, UIConstraints *constr
   return false;
 }
 
-bool draw_icon_button_with_location(const char *file, int line, UIConstraints *constraints, Color btn_color, const TextureId icon_tex_id, f32 radius, Alignment align, ButtonState state) {
+bool draw_icon_button_with_location(const char *file, int line, UIConstraints *constraints, const TextureId icon_tex_id, UiStyle style, ButtonState state) {
   CORE_DEBUG_ASSERT(icon_tex_id, "draw_icon_button() requires that you provide an icon texture");
 
   UiIdHash hash = core_fnv_hash32(file, strlen(file), CORE_FNV_HASH32_INIT);
   hash = core_fnv_hash32(&line, sizeof(line), hash);
 
   Rect rect = {0};
-  Color icon_color = COLOR_WHITE;
 
   apply_constraints(constraints, &rect.pos, &rect.size);
-  apply_alignment(align, constraints, &rect.pos, rect.size);
+  apply_alignment(style.align, constraints, &rect.pos, rect.size);
 
   bool is_hovered = inside_rect(&rect, &zephr_ctx->mouse.pos);
   bool left_mouse_pressed = zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT;
@@ -500,22 +500,22 @@ bool draw_icon_button_with_location(const char *file, int line, UIConstraints *c
     zephr_set_cursor(ZEPHR_CURSOR_HAND);
 
     if (left_mouse_pressed) {
-      btn_color = mult_color(btn_color, 0.8f);
-      icon_color = mult_color(icon_color, 0.8f);
+      style.bg_color = mult_color(style.bg_color, 0.8f);
+      style.fg_color = mult_color(style.fg_color, 0.8f);
     } else {
-      btn_color = mult_color(btn_color, 0.9f);
-      icon_color = mult_color(icon_color, 0.9f);
+      style.bg_color = mult_color(style.bg_color, 0.9f);
+      style.fg_color = mult_color(style.fg_color, 0.9f);
     }
   } else if (state == BUTTON_STATE_DISABLED) {
     if (is_hovered) {
       zephr_set_cursor(ZEPHR_CURSOR_DISABLED);
     }
 
-    icon_color.a = 100;
-    btn_color.a = 100;
+    style.fg_color.a = 100;
+    style.bg_color.a = 100;
   }
 
-  draw_quad(constraints, btn_color, radius, align);
+  draw_quad(constraints, style);
 
   UIConstraints icon_constraints = default_constraints;
 
@@ -524,7 +524,7 @@ bool draw_icon_button_with_location(const char *file, int line, UIConstraints *c
   set_y_constraint(&icon_constraints, 0, UI_CONSTRAINT_RELATIVE_PIXELS);
   set_width_constraint(&icon_constraints, constraints->width * 0.8f, UI_CONSTRAINT_FIXED);
   set_height_constraint(&icon_constraints, constraints->height * 0.8f, UI_CONSTRAINT_FIXED);
-  draw_texture(&icon_constraints, icon_tex_id, icon_color, 0, ALIGN_CENTER);
+  draw_texture(&icon_constraints, icon_tex_id, style.fg_color, 0, ALIGN_CENTER);
 
   if (clicked && state == BUTTON_STATE_ACTIVE) {
     return true;
@@ -613,12 +613,17 @@ f32 draw_color_picker_slider_with_location(const char *file, int line, UIConstra
   set_width_constraint(&triangle_con, 14, UI_CONSTRAINT_RELATIVE_PIXELS);
   set_height_constraint(&triangle_con, 0.5f, UI_CONSTRAINT_ASPECT_RATIO);
   triangle_con.y += -(triangle_con.height / 2.f);
-  draw_triangle(&triangle_con, COLOR_BLACK, ALIGN_TOP_LEFT);
+  UiStyle tri_style = {
+    .bg_color = COLOR_BLACK,
+    .border_radius = 0,
+    .align = ALIGN_TOP_LEFT,
+  };
+  draw_triangle(&triangle_con, tri_style);
 
   set_x_constraint(&triangle_con, 1, UI_CONSTRAINT_RELATIVE);
   triangle_con.x -= triangle_con.height / 2;
   set_rotation_constraint(&triangle_con, 90);
-  draw_triangle(&triangle_con, COLOR_BLACK, ALIGN_TOP_LEFT);
+  draw_triangle(&triangle_con, tri_style);
 
   return slider_selection;
 }
@@ -708,22 +713,27 @@ Vec2f draw_color_picker_canvas_with_location(const char* file, int line, UIConst
   triangle_con.x -= triangle_con.height;
   triangle_con.y -= triangle_con.height * 2;
   set_rotation_constraint(&triangle_con, 0);
-  draw_triangle(&triangle_con, COLOR_WHITE, ALIGN_TOP_LEFT);
+  UiStyle tri_style = {
+    .bg_color = COLOR_WHITE,
+    .border_radius = 0,
+    .align = ALIGN_TOP_LEFT,
+  };
+  draw_triangle(&triangle_con, tri_style);
 
   triangle_con.x += triangle_con.height * 2;
   triangle_con.y += triangle_con.height * 2;
   set_rotation_constraint(&triangle_con, 90);
-  draw_triangle(&triangle_con, COLOR_WHITE, ALIGN_TOP_LEFT);
+  draw_triangle(&triangle_con, tri_style);
 
   triangle_con.x -= triangle_con.height * 2;
   triangle_con.y += triangle_con.height * 2;
   set_rotation_constraint(&triangle_con, 180);
-  draw_triangle(&triangle_con, COLOR_WHITE, ALIGN_TOP_LEFT);
+  draw_triangle(&triangle_con, tri_style);
 
   triangle_con.x -= triangle_con.height * 2;
   triangle_con.y -= triangle_con.height * 2;
   set_rotation_constraint(&triangle_con, 270);
-  draw_triangle(&triangle_con, COLOR_WHITE, ALIGN_TOP_LEFT);
+  draw_triangle(&triangle_con, tri_style);
 
   return canvas_pos;
 }
@@ -736,7 +746,12 @@ void draw_color_picker_popup(UIConstraints *picker_button_con) {
   set_y_constraint(&popup_con, picker_button_con->height + 20, UI_CONSTRAINT_FIXED);
   set_width_constraint(&popup_con, 450, UI_CONSTRAINT_RELATIVE_PIXELS);
   set_height_constraint(&popup_con, 480, UI_CONSTRAINT_RELATIVE_PIXELS);
-  draw_quad(&popup_con, mult_color(COLOR_WHITE, 0.94f), 8, ALIGN_TOP_LEFT);
+  UiStyle popup_style = {
+    .bg_color = mult_color(COLOR_WHITE, 0.94f),
+    .border_radius = 8,
+    .align = ALIGN_TOP_LEFT,
+  };
+  draw_quad(&popup_con, popup_style);
 
   UIConstraints color_slider_con = default_constraints;
   set_parent_constraint(&color_slider_con, &popup_con);
@@ -757,15 +772,23 @@ void draw_color_picker_popup(UIConstraints *picker_button_con) {
   set_y_constraint(&button_con, -0.05f, UI_CONSTRAINT_RELATIVE);
   set_width_constraint(&button_con, 0.43f, UI_CONSTRAINT_RELATIVE);
   set_height_constraint(&button_con, 0.3f, UI_CONSTRAINT_ASPECT_RATIO);
-  if (draw_button(&button_con, *zephr_ctx->ui.popup_revert_color, "Revert", 4, ALIGN_BOTTOM_LEFT, BUTTON_STATE_ACTIVE)) {
+  UiStyle button_style = {
+    .bg_color = *zephr_ctx->ui.popup_revert_color,
+    .fg_color = COLOR_BLACK,
+    .border_radius = 4,
+    .align = ALIGN_BOTTOM_LEFT,
+  };
+  if (draw_button(&button_con, "Revert", button_style, BUTTON_STATE_ACTIVE)) {
     zephr_ctx->ui.popup_open = false;
   }
 
   Color selected_color = hsv2rgb(slider_selection * 360.f, canvas_pos.x, 1.0f - canvas_pos.y);
 
+  button_style.align = ALIGN_BOTTOM_RIGHT;
   set_x_constraint(&button_con, -0.04f, UI_CONSTRAINT_RELATIVE);
   set_y_constraint(&button_con, -0.05f, UI_CONSTRAINT_RELATIVE);
-  if (draw_button(&button_con, selected_color, "Apply", 4, ALIGN_BOTTOM_RIGHT, BUTTON_STATE_ACTIVE)) {
+  button_style.bg_color = selected_color;
+  if (draw_button(&button_con, "Apply", button_style, BUTTON_STATE_ACTIVE)) {
     *zephr_ctx->ui.popup_revert_color = selected_color;
     zephr_ctx->ui.popup_open = false;
   }
@@ -803,7 +826,12 @@ void draw_color_picker(UIConstraints *constraints, Color *color, Alignment align
     display_color.a = 100;
   }
 
-  draw_quad(&con, display_color, con.width * 0.08f, align);
+  UiStyle style = {
+    .bg_color = display_color,
+    .border_radius = con.width * 0.08f,
+    .align = align,
+  };
+  draw_quad(&con, style);
 
   if (is_hovered && state == BUTTON_STATE_ACTIVE && zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
     zephr_ctx->ui.popup_open = true;
