@@ -124,3 +124,21 @@ _Noreturn uintptr_t _core_abort(const char* file, int line, const char* message,
 /* 	return (bool)(bitset[bit_idx >> 6] & (1 << (bit_idx & 63))); */
 /* } */
 
+
+///////////////////////////
+//
+//
+// Hash
+//
+//
+///////////////////////////
+
+#define CORE_FNV_HASH32_INIT  0x811c9dc5
+#define CORE_FNV_HASH32_PRIME 0x01000193
+
+#define CORE_FNV_HASH64_INIT  0xcbf29ce484222325
+#define CORE_FNV_HASH64_PRIME 0x00000100000001B3
+
+u32 core_fnv_hash32(const void* bytes, uptr size, u32 hash);
+u64 core_fnv_hash64(const void* bytes, uptr size, u64 hash);
+

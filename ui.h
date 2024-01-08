@@ -3,6 +3,8 @@
 #include "texture.h"
 #include "zephr_math.h"
 
+typedef u32 UiIdHash;
+
 typedef enum Alignment {
   ALIGN_TOP_LEFT,
   ALIGN_TOP_CENTER,
@@ -44,6 +46,7 @@ typedef struct UI {
   Rect popup_rect;
   UIConstraints popup_parent_constraints;
   Color *popup_revert_color;
+  UiIdHash active_element;
 } UI;
 
 typedef enum ButtonState {
@@ -65,7 +68,10 @@ bool inside_rect(Rect *rect, Vec2 *point);
 void draw_quad(UIConstraints *constraints, const Color color, float border_radius, Alignment align);
 void draw_circle(UIConstraints *constraints, const Color color, Alignment align);
 void draw_triangle(UIConstraints *constraints, const Color color, Alignment align);
-bool draw_button(UIConstraints *constraints, Color color, const char *text, f32 radius, Alignment align, ButtonState state);
-bool draw_icon_button(UIConstraints *constraints, Color color, const TextureId icon_tex_id, f32 radius, Alignment align, ButtonState state);
+bool draw_button_with_location(const char* file, int line, UIConstraints *constraints, Color color, const char *text, f32 radius, Alignment align, ButtonState state);
+bool draw_icon_button_with_location(const char* fie, int line, UIConstraints *constraints, Color color, const TextureId icon_tex_id, f32 radius, Alignment align, ButtonState state);
 void draw_color_picker_popup(UIConstraints *picker_button_con);
 void draw_color_picker(UIConstraints *constraints, Color *color, Alignment align, ButtonState state);
+
+#define draw_button(constraints, color, text, radius, align, state) draw_button_with_location(__FILE__, __LINE__, constraints, color, text, radius, align, state)
+#define draw_icon_button(constraints, color, icon_tex_id, radius, align, state) draw_icon_button_with_location(__FILE__, __LINE__, constraints, color, icon_tex_id, radius, align, state)

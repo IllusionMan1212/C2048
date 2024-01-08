@@ -1073,15 +1073,9 @@ bool zephr_iter_events(ZephrEvent *event_out) {
           break;
         case Button2:
           event_out->mouse.button = ZEPHR_MOUSE_BUTTON_MIDDLE;
-          if (!inside_rect(&zephr_ctx->ui.popup_rect, &event_out->mouse.position)) {
-            zephr_ctx->ui.popup_open = false;
-          }
           break;
         case Button3:
           event_out->mouse.button = ZEPHR_MOUSE_BUTTON_RIGHT;
-          if (!inside_rect(&zephr_ctx->ui.popup_rect, &event_out->mouse.position)) {
-            zephr_ctx->ui.popup_open = false;
-          }
           break;
       }
 

@@ -28,38 +28,6 @@ const Vec2 neighbors[4] = {
 //
 ///////////////////////////////////
 
-void print_board() {
-  printf("Board:\n");
-  for (int i = 0; i < 4; i++) {
-    printf("  ");
-    for (int j = 0; j < 4; j++) {
-      printf("%d ", game.board[i][j].value);
-    }
-    printf("\n");
-  }
-}
-
-void print_merge_status() {
-  printf("Merge Board:\n");
-  for (int i = 0; i < 4; i++) {
-    printf("  ");
-    for (int j = 0; j < 4; j++) {
-      printf("%d ", game.board[i][j].merged);
-    }
-    printf("\n");
-  }
-}
-
-void print_new_board() {
-  printf("New Board:\n");
-  for (int i = 0; i < 4; i++) {
-    printf("  ");
-    for (int j = 0; j < 4; j++) {
-      printf("%d ", game.board[i][j].new_value);
-    }
-    printf("\n");
-  }
-}
 
 Color get_tile_color(u16 value) {
   switch (value) {

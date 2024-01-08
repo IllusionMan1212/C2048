@@ -31,3 +31,33 @@ _Noreturn uintptr_t _core_abort(const char* file, int line, const char* message,
   /* fprintf(stderr, "stacktrace:\n%s\n\n", stacktrace); */
   abort();
 }
+
+
+///////////////////////////
+//
+//
+// Hash
+//
+//
+///////////////////////////
+
+u32 core_fnv_hash32(const void* bytes, uptr size, u32 hash) {
+	const u8* b = bytes;
+	for (uptr idx = 0; idx < size; idx++) {
+		hash ^= b[idx];
+		hash *= CORE_FNV_HASH32_PRIME;
+	}
+
+	return hash;
+}
+
+u64 core_fnv_hash64(const void* bytes, uptr size, u64 hash) {
+	const u8* b = bytes;
+	for(uptr idx = 0; idx < size; idx++) {
+		hash ^= b[idx];
+		hash *= CORE_FNV_HASH64_PRIME;
+	}
+
+	return hash;
+}
+

@@ -1,10 +1,12 @@
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <glad/glx.h>
 #include <stb_image.h>
 
 #include "shader.h"
+#include "ui.h"
 #include "zephr.h"
 
 Shader ui_shader;
@@ -208,7 +210,7 @@ bool inside_rect(Rect *rect, Vec2 *point) {
   /* } */
 
   if ((point->x >= rect->pos.x && point->x <= rect->pos.x + rect->size.width &&
-      point->y >= rect->pos.y && point->y <= rect->pos.y + rect->size.height)) {
+        point->y >= rect->pos.y && point->y <= rect->pos.y + rect->size.height)) {
     return true;
   }
   return false;
@@ -388,7 +390,10 @@ void draw_texture(UIConstraints *constraints, const TextureId texture_id, const 
   set_bool(ui_shader, "hasTexture", false);
 }
 
-bool draw_button(UIConstraints *constraints, const Color color, const char *text, f32 radius, Alignment align, ButtonState state) {
+bool draw_button_with_location(const char *file, int line, UIConstraints *constraints, const Color color, const char *text, f32 radius, Alignment align, ButtonState state) {
+  UiIdHash hash = core_fnv_hash32(file, strlen(file), CORE_FNV_HASH32_INIT);
+  hash = core_fnv_hash32(&line, sizeof(line), hash);
+
   Color text_color = COLOR_BLACK;
   text_color.a = color.a;
   Rect rect = {0};
@@ -398,6 +403,22 @@ bool draw_button(UIConstraints *constraints, const Color color, const char *text
 
   bool is_hovered = inside_rect(&rect, &zephr_ctx->mouse.pos);
   bool left_mouse_pressed = zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT;
+  bool left_mouse_released = zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT;
+  bool clicked = false;
+
+  if (zephr_ctx->ui.active_element == 0) {
+    if (is_hovered && left_mouse_pressed) {
+      zephr_ctx->ui.active_element = hash;
+    }
+  } else if (zephr_ctx->ui.active_element == hash) {
+    if (left_mouse_released) {
+      zephr_ctx->ui.active_element = 0;
+
+      if (is_hovered) {
+        clicked = true;
+      }
+    }
+  }
 
   if (is_hovered && state == BUTTON_STATE_ACTIVE) {
     zephr_set_cursor(ZEPHR_CURSOR_HAND);
@@ -437,15 +458,18 @@ bool draw_button(UIConstraints *constraints, const Color color, const char *text
     draw_text(text, font_size, text_constraints, text_color, ALIGN_CENTER);
   }
 
-  if (is_hovered && state == BUTTON_STATE_ACTIVE && zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
+  if (clicked && state == BUTTON_STATE_ACTIVE) {
     return true;
   }
 
   return false;
 }
 
-bool draw_icon_button(UIConstraints *constraints, Color btn_color, const TextureId icon_tex_id, f32 radius, Alignment align, ButtonState state) {
+bool draw_icon_button_with_location(const char *file, int line, UIConstraints *constraints, Color btn_color, const TextureId icon_tex_id, f32 radius, Alignment align, ButtonState state) {
   CORE_DEBUG_ASSERT(icon_tex_id, "draw_icon_button() requires that you provide an icon texture");
+
+  UiIdHash hash = core_fnv_hash32(file, strlen(file), CORE_FNV_HASH32_INIT);
+  hash = core_fnv_hash32(&line, sizeof(line), hash);
 
   Rect rect = {0};
   Color icon_color = COLOR_WHITE;
@@ -455,6 +479,22 @@ bool draw_icon_button(UIConstraints *constraints, Color btn_color, const Texture
 
   bool is_hovered = inside_rect(&rect, &zephr_ctx->mouse.pos);
   bool left_mouse_pressed = zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT;
+  bool left_mouse_released = zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT;
+  bool clicked = false;
+
+  if (zephr_ctx->ui.active_element == 0) {
+    if (is_hovered && left_mouse_pressed) {
+      zephr_ctx->ui.active_element = hash;
+    }
+  } else if (zephr_ctx->ui.active_element == hash) {
+    if (left_mouse_released) {
+      zephr_ctx->ui.active_element = 0;
+
+      if (is_hovered) {
+        clicked = true;
+      }
+    }
+  }
 
   if (is_hovered && state == BUTTON_STATE_ACTIVE) {
     zephr_set_cursor(ZEPHR_CURSOR_HAND);
@@ -486,47 +526,58 @@ bool draw_icon_button(UIConstraints *constraints, Color btn_color, const Texture
   set_height_constraint(&icon_constraints, constraints->height * 0.8f, UI_CONSTRAINT_FIXED);
   draw_texture(&icon_constraints, icon_tex_id, icon_color, 0, ALIGN_CENTER);
 
-  if (is_hovered && state == BUTTON_STATE_ACTIVE && zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
+  if (clicked && state == BUTTON_STATE_ACTIVE) {
     return true;
   }
 
   return false;
 }
 
-f32 draw_color_picker_slider(UIConstraints *constraints, Alignment align) {
+#define draw_color_picker_slider(constraints, align) draw_color_picker_slider_with_location(__FILE__, __LINE__, constraints, align)
+
+f32 draw_color_picker_slider_with_location(const char *file, int line, UIConstraints *constraints, Alignment align) {
   static f32 slider_selection = 0;
-  static bool slider_dragging = false;
+  static bool dragging = false;
+
+  UiIdHash hash = core_fnv_hash32(file, strlen(file), CORE_FNV_HASH32_INIT);
+  hash = core_fnv_hash32(&line, sizeof(line), hash);
 
   use_shader(color_chooser_shader);
 
   set_bool(color_chooser_shader, "isSlider", true);
   set_mat4f(color_chooser_shader, "projection", (float *)zephr_ctx->projection.m);
 
-  Vec2f pos = { 0.f, 0.f };
-  Sizef size = { 0.f, 0.f };
+  Rect rect = {0};
 
-  apply_constraints(constraints, &pos, &size);
-  apply_alignment(align, constraints, &pos, size);
+  apply_constraints(constraints, &rect.pos, &rect.size);
+  apply_alignment(align, constraints, &rect.pos, rect.size);
 
   // set the positions after applying alignment so children can use them
-  constraints->x = pos.x;
-  constraints->y = pos.y;
+  constraints->x = rect.pos.x;
+  constraints->y = rect.pos.y;
 
-  if (inside_rect(&(Rect){{constraints->x, constraints->y}, {constraints->width, constraints->height}}, &zephr_ctx->mouse.pos) &&
-      zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
-    slider_dragging = true;
+  bool is_hovered = inside_rect(&rect, &zephr_ctx->mouse.pos);
+  bool left_mouse_pressed = zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT;
+  bool left_mouse_released = zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT;
+
+  if (zephr_ctx->ui.active_element == 0) {
+    if (is_hovered && left_mouse_pressed) {
+      zephr_ctx->ui.active_element = hash;
+      dragging = true;
+    }
+  } else if (zephr_ctx->ui.active_element == hash) {
+    if (left_mouse_released) {
+      zephr_ctx->ui.active_element = 0;
+      dragging = false;
+    }
   }
 
-  if (zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
-    slider_dragging = false;
-  }
-
-  if (slider_dragging) {
+  if (dragging) {
     slider_selection = CORE_CLAMP((zephr_ctx->mouse.pos.y - constraints->y) / constraints->height, 0, 1);
   }
 
   Matrix4x4 model = identity();
-  apply_translation(&model, pos);
+  apply_translation(&model, rect.pos);
 
   set_mat4f(color_chooser_shader, "model", (float *)model.m);
 
@@ -534,14 +585,14 @@ f32 draw_color_picker_slider(UIConstraints *constraints, Alignment align) {
 
   float vertices[6][4] = {
     // bottom left tri
-    {0,              0 + size.height, 0.0, 1.0},
-    {0,              0,               0.0, 0.0},
-    {0 + size.width, 0,               1.0, 0.0},
+    {0,                   0 + rect.size.height, 0.0, 1.0},
+    {0,                   0,                    0.0, 0.0},
+    {0 + rect.size.width, 0,                    1.0, 0.0},
 
     // top right tri
-    {0,              0 + size.height, 0.0, 1.0},
-    {0 + size.width, 0,               1.0, 0.0},
-    {0 + size.width, 0 + size.height, 1.0, 1.0},
+    {0,                   0 + rect.size.height, 0.0, 1.0},
+    {0 + rect.size.width, 0,                    1.0, 0.0},
+    {0 + rect.size.width, 0 + rect.size.height, 1.0, 1.0},
   };
 
   glBindBuffer(GL_ARRAY_BUFFER, ui_vbo);
@@ -553,12 +604,33 @@ f32 draw_color_picker_slider(UIConstraints *constraints, Alignment align) {
   glBindVertexArray(0);
   set_bool(color_chooser_shader, "isSlider", false);
 
+  // draw the selection
+  UIConstraints triangle_con = default_constraints;
+  set_parent_constraint(&triangle_con, constraints);
+  set_x_constraint(&triangle_con, -11, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_y_constraint(&triangle_con, slider_selection, UI_CONSTRAINT_RELATIVE);
+  set_rotation_constraint(&triangle_con, -90);
+  set_width_constraint(&triangle_con, 14, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_height_constraint(&triangle_con, 0.5f, UI_CONSTRAINT_ASPECT_RATIO);
+  triangle_con.y += -(triangle_con.height / 2.f);
+  draw_triangle(&triangle_con, COLOR_BLACK, ALIGN_TOP_LEFT);
+
+  set_x_constraint(&triangle_con, 1, UI_CONSTRAINT_RELATIVE);
+  triangle_con.x -= triangle_con.height / 2;
+  set_rotation_constraint(&triangle_con, 90);
+  draw_triangle(&triangle_con, COLOR_BLACK, ALIGN_TOP_LEFT);
+
   return slider_selection;
 }
 
-Vec2f draw_color_picker_canvas(UIConstraints *constraints, f32 slider_percentage, Alignment align) {
-  static bool canvas_dragging = false;
+#define draw_color_picker_canvas(constraints, slider_percentage, align) draw_color_picker_canvas_with_location(__FILE__, __LINE__, constraints, slider_percentage, align)
+
+Vec2f draw_color_picker_canvas_with_location(const char* file, int line, UIConstraints *constraints, f32 slider_percentage, Alignment align) {
+  static bool dragging = false;
   static Vec2f canvas_pos = {0};
+
+  UiIdHash hash = core_fnv_hash32(file, strlen(file), CORE_FNV_HASH32_INIT);
+  hash = core_fnv_hash32(&line, sizeof(line), hash);
 
   use_shader(color_chooser_shader);
 
@@ -566,26 +638,32 @@ Vec2f draw_color_picker_canvas(UIConstraints *constraints, f32 slider_percentage
   set_float(color_chooser_shader, "sliderPercentage", slider_percentage);
   set_mat4f(color_chooser_shader, "projection", (float *)zephr_ctx->projection.m);
 
-  Vec2f pos = { 0.f, 0.f };
-  Sizef size = { 0.f, 0.f };
+  Rect rect = {0};
 
-  apply_constraints(constraints, &pos, &size);
-  apply_alignment(align, constraints, &pos, size);
+  apply_constraints(constraints, &rect.pos, &rect.size);
+  apply_alignment(align, constraints, &rect.pos, rect.size);
 
   // set the positions after applying alignment so children can use them
-  constraints->x = pos.x;
-  constraints->y = pos.y;
+  constraints->x = rect.pos.x;
+  constraints->y = rect.pos.y;
 
-  if (inside_rect(&(Rect){{constraints->x, constraints->y}, {constraints->width, constraints->height}}, &zephr_ctx->mouse.pos) &&
-      zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
-    canvas_dragging = true;
+  bool is_hovered = inside_rect(&rect, &zephr_ctx->mouse.pos);
+  bool left_mouse_pressed = zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT;
+  bool left_mouse_released = zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT;
+
+  if (zephr_ctx->ui.active_element == 0) {
+    if (is_hovered && left_mouse_pressed) {
+      zephr_ctx->ui.active_element = hash;
+      dragging = true;
+    }
+  } else if (zephr_ctx->ui.active_element == hash) {
+    if (left_mouse_released) {
+      zephr_ctx->ui.active_element = 0;
+      dragging = false;
+    }
   }
 
-  if (zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
-    canvas_dragging = false;
-  }
-
-  if (canvas_dragging) {
+  if (dragging) {
     f32 x = (zephr_ctx->mouse.pos.x - constraints->x) / constraints->width;
     f32 y = (zephr_ctx->mouse.pos.y - constraints->y) / constraints->height;
 
@@ -594,7 +672,7 @@ Vec2f draw_color_picker_canvas(UIConstraints *constraints, f32 slider_percentage
   }
 
   Matrix4x4 model = identity();
-  apply_translation(&model, pos);
+  apply_translation(&model, rect.pos);
 
   set_mat4f(color_chooser_shader, "model", (float *)model.m);
 
@@ -602,14 +680,14 @@ Vec2f draw_color_picker_canvas(UIConstraints *constraints, f32 slider_percentage
 
   float vertices[6][4] = {
     // bottom left tri
-    {0,              0 + size.height, 0.0, 1.0},
-    {0,              0,               0.0, 0.0},
-    {0 + size.width, 0,               1.0, 0.0},
+    {0,                   0 + rect.size.height, 0.0, 1.0},
+    {0,                   0,                    0.0, 0.0},
+    {0 + rect.size.width, 0,                    1.0, 0.0},
 
     // top right tri
-    {0,              0 + size.height, 0.0, 1.0},
-    {0 + size.width, 0,               1.0, 0.0},
-    {0 + size.width, 0 + size.height, 1.0, 1.0},
+    {0,                   0 + rect.size.height, 0.0, 1.0},
+    {0 + rect.size.width, 0,                    1.0, 0.0},
+    {0 + rect.size.width, 0 + rect.size.height, 1.0, 1.0},
   };
 
   glBindBuffer(GL_ARRAY_BUFFER, ui_vbo);
@@ -619,6 +697,33 @@ Vec2f draw_color_picker_canvas(UIConstraints *constraints, f32 slider_percentage
   glDrawArrays(GL_TRIANGLES, 0, 6);
 
   glBindVertexArray(0);
+
+  // draw the selection
+  UIConstraints triangle_con = default_constraints;
+  set_parent_constraint(&triangle_con, constraints);
+  set_x_constraint(&triangle_con, canvas_pos.x, UI_CONSTRAINT_RELATIVE);
+  set_y_constraint(&triangle_con, canvas_pos.y, UI_CONSTRAINT_RELATIVE);
+  set_width_constraint(&triangle_con, 14, UI_CONSTRAINT_RELATIVE_PIXELS);
+  set_height_constraint(&triangle_con, 0.5f, UI_CONSTRAINT_ASPECT_RATIO);
+  triangle_con.x -= triangle_con.height;
+  triangle_con.y -= triangle_con.height * 2;
+  set_rotation_constraint(&triangle_con, 0);
+  draw_triangle(&triangle_con, COLOR_WHITE, ALIGN_TOP_LEFT);
+
+  triangle_con.x += triangle_con.height * 2;
+  triangle_con.y += triangle_con.height * 2;
+  set_rotation_constraint(&triangle_con, 90);
+  draw_triangle(&triangle_con, COLOR_WHITE, ALIGN_TOP_LEFT);
+
+  triangle_con.x -= triangle_con.height * 2;
+  triangle_con.y += triangle_con.height * 2;
+  set_rotation_constraint(&triangle_con, 180);
+  draw_triangle(&triangle_con, COLOR_WHITE, ALIGN_TOP_LEFT);
+
+  triangle_con.x -= triangle_con.height * 2;
+  triangle_con.y -= triangle_con.height * 2;
+  set_rotation_constraint(&triangle_con, 270);
+  draw_triangle(&triangle_con, COLOR_WHITE, ALIGN_TOP_LEFT);
 
   return canvas_pos;
 }
@@ -641,49 +746,10 @@ void draw_color_picker_popup(UIConstraints *picker_button_con) {
   set_width_constraint(&color_slider_con, 0.1f, UI_CONSTRAINT_ASPECT_RATIO);
   f32 slider_selection = draw_color_picker_slider(&color_slider_con, ALIGN_TOP_RIGHT);
 
-
-  UIConstraints triangle_con = default_constraints;
-  set_parent_constraint(&triangle_con, &color_slider_con);
-  set_x_constraint(&triangle_con, -11, UI_CONSTRAINT_RELATIVE_PIXELS);
-  set_y_constraint(&triangle_con, slider_selection, UI_CONSTRAINT_RELATIVE);
-  set_rotation_constraint(&triangle_con, -90);
-  set_width_constraint(&triangle_con, 14, UI_CONSTRAINT_RELATIVE_PIXELS);
-  set_height_constraint(&triangle_con, 0.5f, UI_CONSTRAINT_ASPECT_RATIO);
-  triangle_con.y += -(triangle_con.height / 2.f);
-  draw_triangle(&triangle_con, COLOR_BLACK, ALIGN_TOP_LEFT);
-
-  set_x_constraint(&triangle_con, 1, UI_CONSTRAINT_RELATIVE);
-  triangle_con.x -= triangle_con.height / 2;
-  set_rotation_constraint(&triangle_con, 90);
-  draw_triangle(&triangle_con, COLOR_BLACK, ALIGN_TOP_LEFT);
-
   set_x_constraint(&color_slider_con, 0.04f, UI_CONSTRAINT_RELATIVE);
   set_y_constraint(&color_slider_con, 0.05f, UI_CONSTRAINT_RELATIVE);
   set_width_constraint(&color_slider_con, popup_con.width * 0.8f, UI_CONSTRAINT_FIXED);
   Vec2f canvas_pos = draw_color_picker_canvas(&color_slider_con, slider_selection, ALIGN_TOP_LEFT);
-
-  set_parent_constraint(&triangle_con, &color_slider_con);
-  set_x_constraint(&triangle_con, canvas_pos.x, UI_CONSTRAINT_RELATIVE);
-  set_y_constraint(&triangle_con, canvas_pos.y, UI_CONSTRAINT_RELATIVE);
-  triangle_con.x -= triangle_con.height;
-  triangle_con.y -= triangle_con.height * 2;
-  set_rotation_constraint(&triangle_con, 0);
-  draw_triangle(&triangle_con, COLOR_WHITE, ALIGN_TOP_LEFT);
-
-  triangle_con.x += triangle_con.height * 2;
-  triangle_con.y += triangle_con.height * 2;
-  set_rotation_constraint(&triangle_con, 90);
-  draw_triangle(&triangle_con, COLOR_WHITE, ALIGN_TOP_LEFT);
-
-  triangle_con.x -= triangle_con.height * 2;
-  triangle_con.y += triangle_con.height * 2;
-  set_rotation_constraint(&triangle_con, 180);
-  draw_triangle(&triangle_con, COLOR_WHITE, ALIGN_TOP_LEFT);
-
-  triangle_con.x -= triangle_con.height * 2;
-  triangle_con.y -= triangle_con.height * 2;
-  set_rotation_constraint(&triangle_con, 270);
-  draw_triangle(&triangle_con, COLOR_WHITE, ALIGN_TOP_LEFT);
 
   UIConstraints button_con = default_constraints;
   set_parent_constraint(&button_con, &popup_con);
