@@ -885,9 +885,6 @@ void zephr_quit(void) {
   zephr_ctx->should_quit = true;
 }
 
-Color ColorRGBA(u8 r, u8 g, u8 b, u8 a) {
-  return (Color){ r, g, b, a };
-}
 
 ZephrKeyMod zephr_x11_mods_to_zephr_mods(XKeyEvent xkey) {
   ZephrKeyMod zephr_mods = 0;
@@ -1067,9 +1064,10 @@ bool zephr_iter_events(ZephrEvent *event_out) {
       switch (xev.xbutton.button) {
         case Button1:
           event_out->mouse.button = ZEPHR_MOUSE_BUTTON_LEFT;
-          if (!inside_rect(&zephr_ctx->ui.popup_rect, &event_out->mouse.position)) {
-            zephr_ctx->ui.popup_open = false;
-          }
+          /* if (!inside_rect(&zephr_ctx->ui.popup_rect, &event_out->mouse.position)) { */
+          /*   zephr_ctx->ui.popup_open = false; */
+          /*   zephr_ctx->ui.active_element = 0; */
+          /* } */
           break;
         case Button2:
           event_out->mouse.button = ZEPHR_MOUSE_BUTTON_MIDDLE;

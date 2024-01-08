@@ -645,7 +645,7 @@ void draw_settings_dialog(void) {
     set_y_constraint(&color_picker_con, 320 - text_size.height / 2.f + 6, UI_CONSTRAINT_RELATIVE_PIXELS);
     set_width_constraint(&color_picker_con, tile_size, UI_CONSTRAINT_RELATIVE_PIXELS);
     set_height_constraint(&color_picker_con, tile_size, UI_CONSTRAINT_RELATIVE_PIXELS);
-    draw_color_picker(&color_picker_con, &game.palette.tile_colors[i], ALIGN_TOP_LEFT, BUTTON_STATE_ACTIVE);
+    draw_color_picker_with_id(i, &color_picker_con, &game.palette.tile_colors[i], ALIGN_TOP_LEFT, BUTTON_STATE_ACTIVE);
 
     u16 tile_val = (u16)pow(2, i + 1);
     char text[16];

@@ -400,7 +400,6 @@ void zephr_swap_buffers(void);
 Size zephr_get_window_size(void);
 void zephr_toggle_fullscreen(void);
 void zephr_quit(void);
-Color ColorRGBA(u8 r, u8 g, u8 b, u8 a);
 bool zephr_iter_events(ZephrEvent *event_out);
 void zephr_set_cursor(ZephrCursor cursor);
 

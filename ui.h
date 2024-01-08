@@ -78,7 +78,9 @@ void draw_triangle(UIConstraints *constraints, const UiStyle style);
 bool draw_button_with_location(const char* file, int line, UIConstraints *constraints, const char *text, UiStyle style, ButtonState state);
 bool draw_icon_button_with_location(const char* file, int line, UIConstraints *constraints, const TextureId icon_tex_id, UiStyle style, ButtonState state);
 void draw_color_picker_popup(UIConstraints *picker_button_con);
-void draw_color_picker(UIConstraints *constraints, Color *color, Alignment align, ButtonState state);
+void draw_color_picker_with_location_and_id(u32 id, const char *file, int line, UIConstraints *constraints, Color *color, Alignment align, ButtonState state);
 
 #define draw_button(constraints, text, style, state) draw_button_with_location(__FILE__, __LINE__, constraints, text, style, state)
 #define draw_icon_button(constraints, icon_tex_id, style, state) draw_icon_button_with_location(__FILE__, __LINE__, constraints, icon_tex_id, style, state)
+#define draw_color_picker(constraints, color, align, state) draw_color_picker_with_location_and_id(0, __FILE__, __LINE__, constraints, color, align, state)
+#define draw_color_picker_with_id(id, constraints, color, align, state) draw_color_picker_with_location_and_id(id, __FILE__, __LINE__, constraints, color, align, state)

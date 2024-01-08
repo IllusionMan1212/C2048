@@ -1,5 +1,6 @@
 #include <math.h>
 
+#include "zephr.h"
 #include "zephr_math.h"
 
 float to_radians(float degrees) {
@@ -106,4 +107,28 @@ Color hsv2rgb(float h, float s, float v) {
   }
 
   return (Color){(u8)((r + m) * 255), (u8)((g + m) * 255), (u8)((b + m) * 255), 255};
+}
+
+f32 get_srgb(u8 c) {
+  return (f32)(c / 255.f <= 0.03928f
+      ? c / 255.f / 12.92f
+      : pow((c / 255.f + 0.055f) / 1.055f, 2.4f));
+}
+
+f32 get_luminance(Color *color) {
+  return ((0.2126f * (f32)get_srgb(color->r)) + (0.7152f * (f32)get_srgb(color->g)) + (0.0722f * (f32)get_srgb(color->b))) / 255.f;
+}
+
+f32 get_contrast(Color *fg, Color *bg) {
+  f32 l1 = get_luminance(fg);
+  f32 l2 = get_luminance(bg);
+
+  return (CORE_MAX(l1, l2) + 0.05f) / (CORE_MIN(l1, l2) + 0.05f);
+}
+
+Color determine_color_contrast(Color *bg) {
+  f32 white_contrast = get_contrast(bg, &COLOR_WHITE);
+  f32 black_contrast = get_contrast(bg, &COLOR_BLACK);
+
+  return white_contrast > black_contrast ? COLOR_WHITE : COLOR_BLACK;
 }

@@ -630,7 +630,7 @@ f32 draw_color_picker_slider_with_location(const char *file, int line, UIConstra
 
 #define draw_color_picker_canvas(constraints, slider_percentage, align) draw_color_picker_canvas_with_location(__FILE__, __LINE__, constraints, slider_percentage, align)
 
-Vec2f draw_color_picker_canvas_with_location(const char* file, int line, UIConstraints *constraints, f32 slider_percentage, Alignment align) {
+Color draw_color_picker_canvas_with_location(const char* file, int line, UIConstraints *constraints, f32 slider_percentage, Alignment align) {
   static bool dragging = false;
   static Vec2f canvas_pos = {0};
 
@@ -703,6 +703,8 @@ Vec2f draw_color_picker_canvas_with_location(const char* file, int line, UIConst
 
   glBindVertexArray(0);
 
+  Color selected_color = hsv2rgb(slider_percentage * 360.f, canvas_pos.x, 1.0f - canvas_pos.y);
+
   // draw the selection
   UIConstraints triangle_con = default_constraints;
   set_parent_constraint(&triangle_con, constraints);
@@ -711,10 +713,10 @@ Vec2f draw_color_picker_canvas_with_location(const char* file, int line, UIConst
   set_width_constraint(&triangle_con, 14, UI_CONSTRAINT_RELATIVE_PIXELS);
   set_height_constraint(&triangle_con, 0.5f, UI_CONSTRAINT_ASPECT_RATIO);
   triangle_con.x -= triangle_con.height;
-  triangle_con.y -= triangle_con.height * 2;
+  triangle_con.y -= triangle_con.height + triangle_con.height / 2 + triangle_con.width / 2;
   set_rotation_constraint(&triangle_con, 0);
   UiStyle tri_style = {
-    .bg_color = COLOR_WHITE,
+    .bg_color = determine_color_contrast(&selected_color),
     .border_radius = 0,
     .align = ALIGN_TOP_LEFT,
   };
@@ -735,7 +737,7 @@ Vec2f draw_color_picker_canvas_with_location(const char* file, int line, UIConst
   set_rotation_constraint(&triangle_con, 270);
   draw_triangle(&triangle_con, tri_style);
 
-  return canvas_pos;
+  return selected_color;
 }
 
 // TODO: consume mouse events on the popup
@@ -764,7 +766,7 @@ void draw_color_picker_popup(UIConstraints *picker_button_con) {
   set_x_constraint(&color_slider_con, 0.04f, UI_CONSTRAINT_RELATIVE);
   set_y_constraint(&color_slider_con, 0.05f, UI_CONSTRAINT_RELATIVE);
   set_width_constraint(&color_slider_con, popup_con.width * 0.8f, UI_CONSTRAINT_FIXED);
-  Vec2f canvas_pos = draw_color_picker_canvas(&color_slider_con, slider_selection, ALIGN_TOP_LEFT);
+  Color selected_color = draw_color_picker_canvas(&color_slider_con, slider_selection, ALIGN_TOP_LEFT);
 
   UIConstraints button_con = default_constraints;
   set_parent_constraint(&button_con, &popup_con);
@@ -774,7 +776,7 @@ void draw_color_picker_popup(UIConstraints *picker_button_con) {
   set_height_constraint(&button_con, 0.3f, UI_CONSTRAINT_ASPECT_RATIO);
   UiStyle button_style = {
     .bg_color = *zephr_ctx->ui.popup_revert_color,
-    .fg_color = COLOR_BLACK,
+    .fg_color = determine_color_contrast(zephr_ctx->ui.popup_revert_color),
     .border_radius = 4,
     .align = ALIGN_BOTTOM_LEFT,
   };
@@ -782,9 +784,8 @@ void draw_color_picker_popup(UIConstraints *picker_button_con) {
     zephr_ctx->ui.popup_open = false;
   }
 
-  Color selected_color = hsv2rgb(slider_selection * 360.f, canvas_pos.x, 1.0f - canvas_pos.y);
-
   button_style.align = ALIGN_BOTTOM_RIGHT;
+  button_style.fg_color = determine_color_contrast(&selected_color);
   set_x_constraint(&button_con, -0.04f, UI_CONSTRAINT_RELATIVE);
   set_y_constraint(&button_con, -0.05f, UI_CONSTRAINT_RELATIVE);
   button_style.bg_color = selected_color;
@@ -796,7 +797,11 @@ void draw_color_picker_popup(UIConstraints *picker_button_con) {
   zephr_ctx->ui.popup_rect = (Rect){{popup_con.x, popup_con.y}, {popup_con.width, popup_con.height}};
 }
 
-void draw_color_picker(UIConstraints *constraints, Color *color, Alignment align, ButtonState state) {
+void draw_color_picker_with_location_and_id(u32 id, const char* file, int line, UIConstraints *constraints, Color *color, Alignment align, ButtonState state) {
+  UiIdHash hash = core_fnv_hash32(&id, sizeof(id), CORE_FNV_HASH32_INIT);
+  hash = core_fnv_hash32(file, strlen(file), hash);
+  hash = core_fnv_hash32(&line, sizeof(line), hash);
+
   Rect rect = {0};
   Color display_color = *color;
 
@@ -807,6 +812,22 @@ void draw_color_picker(UIConstraints *constraints, Color *color, Alignment align
 
   bool is_hovered = inside_rect(&rect, &zephr_ctx->mouse.pos);
   bool left_mouse_pressed = zephr_ctx->mouse.pressed && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT;
+  bool left_mouse_released = zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT;
+  bool clicked = false;
+
+  if (zephr_ctx->ui.active_element == 0) {
+    if (is_hovered && left_mouse_pressed) {
+      zephr_ctx->ui.active_element = hash;
+    }
+  } else if (zephr_ctx->ui.active_element == hash) {
+    if (left_mouse_released) {
+      zephr_ctx->ui.active_element = 0;
+
+      if (is_hovered) {
+        clicked = true;
+      }
+    }
+  }
 
   if (is_hovered && state == BUTTON_STATE_ACTIVE) {
     zephr_set_cursor(ZEPHR_CURSOR_HAND);
@@ -833,7 +854,7 @@ void draw_color_picker(UIConstraints *constraints, Color *color, Alignment align
   };
   draw_quad(&con, style);
 
-  if (is_hovered && state == BUTTON_STATE_ACTIVE && zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) {
+  if (clicked && state == BUTTON_STATE_ACTIVE) {
     zephr_ctx->ui.popup_open = true;
     zephr_ctx->ui.popup_parent_constraints = con;
     zephr_ctx->ui.popup_revert_color = color;
