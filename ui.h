@@ -43,6 +43,7 @@ typedef struct Rect {
 
 typedef struct UI {
   bool popup_open;
+  UiIdHash popup_parent_hash;
   Rect popup_rect;
   UIConstraints popup_parent_constraints;
   Color *popup_revert_color;

@@ -853,6 +853,7 @@ bool zephr_should_quit(void) {
 
   zephr_ctx->cursor = ZEPHR_CURSOR_ARROW;
   zephr_ctx->mouse.released = false;
+  zephr_ctx->mouse.pressed = false;
 
   audio_update();
 
@@ -866,6 +867,7 @@ void zephr_swap_buffers(void) {
   if (zephr_ctx->ui.popup_open) {
     draw_color_picker_popup(&zephr_ctx->ui.popup_parent_constraints);
   }
+  zephr_ctx->ui.popup_open = false;
 
   glXSwapBuffers(x11_display, x11_window);
   XDefineCursor(x11_display, x11_window, zephr_ctx->cursors[zephr_ctx->cursor]);
@@ -1064,10 +1066,6 @@ bool zephr_iter_events(ZephrEvent *event_out) {
       switch (xev.xbutton.button) {
         case Button1:
           event_out->mouse.button = ZEPHR_MOUSE_BUTTON_LEFT;
-          /* if (!inside_rect(&zephr_ctx->ui.popup_rect, &event_out->mouse.position)) { */
-          /*   zephr_ctx->ui.popup_open = false; */
-          /*   zephr_ctx->ui.active_element = 0; */
-          /* } */
           break;
         case Button2:
           event_out->mouse.button = ZEPHR_MOUSE_BUTTON_MIDDLE;

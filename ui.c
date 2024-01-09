@@ -745,12 +745,12 @@ void draw_color_picker_popup(UIConstraints *picker_button_con) {
   UIConstraints popup_con = default_constraints;
   set_parent_constraint(&popup_con, picker_button_con);
   set_x_constraint(&popup_con, 0, UI_CONSTRAINT_FIXED);
-  set_y_constraint(&popup_con, picker_button_con->height + 20, UI_CONSTRAINT_FIXED);
+  set_y_constraint(&popup_con, 1.4f, UI_CONSTRAINT_RELATIVE);
   set_width_constraint(&popup_con, 450, UI_CONSTRAINT_RELATIVE_PIXELS);
   set_height_constraint(&popup_con, 480, UI_CONSTRAINT_RELATIVE_PIXELS);
   UiStyle popup_style = {
     .bg_color = mult_color(COLOR_WHITE, 0.94f),
-    .border_radius = 8,
+    .border_radius = popup_con.width * 0.02f,
     .align = ALIGN_TOP_LEFT,
   };
   draw_quad(&popup_con, popup_style);
@@ -782,6 +782,7 @@ void draw_color_picker_popup(UIConstraints *picker_button_con) {
   };
   if (draw_button(&button_con, "Revert", button_style, BUTTON_STATE_ACTIVE)) {
     zephr_ctx->ui.popup_open = false;
+    zephr_ctx->ui.popup_parent_hash = 0;
   }
 
   button_style.align = ALIGN_BOTTOM_RIGHT;
@@ -792,9 +793,15 @@ void draw_color_picker_popup(UIConstraints *picker_button_con) {
   if (draw_button(&button_con, "Apply", button_style, BUTTON_STATE_ACTIVE)) {
     *zephr_ctx->ui.popup_revert_color = selected_color;
     zephr_ctx->ui.popup_open = false;
+    zephr_ctx->ui.popup_parent_hash = 0;
   }
 
-  zephr_ctx->ui.popup_rect = (Rect){{popup_con.x, popup_con.y}, {popup_con.width, popup_con.height}};
+  Rect rect = {
+    {popup_con.x, popup_con.y},
+    {popup_con.width, popup_con.height},
+  };
+
+  zephr_ctx->ui.popup_rect = rect;
 }
 
 void draw_color_picker_with_location_and_id(u32 id, const char* file, int line, UIConstraints *constraints, Color *color, Alignment align, ButtonState state) {
@@ -858,8 +865,12 @@ void draw_color_picker_with_location_and_id(u32 id, const char* file, int line, 
     zephr_ctx->ui.popup_open = true;
     zephr_ctx->ui.popup_parent_constraints = con;
     zephr_ctx->ui.popup_revert_color = color;
-    /* zephr_ctx->ui.popup_rect = (Rect){rect.pos, rect.size}; */
-    /* draw_color_picker_overlay(constraints); */
+    zephr_ctx->ui.popup_parent_hash = hash;
+  }
+
+  if (zephr_ctx->ui.popup_parent_hash == hash) {
+    zephr_ctx->ui.popup_open = true;
+    zephr_ctx->ui.popup_parent_constraints = con;
   }
 
   /* if (is_hovered && state == BUTTON_STATE_ACTIVE && zephr_ctx->mouse.released && zephr_ctx->mouse.button == ZEPHR_MOUSE_BUTTON_LEFT) { */
